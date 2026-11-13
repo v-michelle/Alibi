@@ -57,4 +57,31 @@ export const uploadPostImage = async (userId: string, imageUri: string) => {
     console.error("Error uploading post image:", error);
     throw error;
   }
-}; 
+};
+
+export const uploadAlibiPhotos = async (
+  photos: { uri: string }[],
+): Promise<string[]> => {
+  if (photos.length === 0) return [];
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError) throw authError;
+  if (!user) throw new Error("You need to be logged in.");
+
+  const paths: string[] = [];
+  const timestamp = Date.now();
+  for (let i = 0; i < photos.length; i++) {
+    const file = new File(photos[i].uri);
+    const bytes = await file.bytes();
+    const path = `${user.id}/${timestamp}-${i}.jpg`;
+    const { error } = await supabase.storage
+      .from("alibi-photos")
+      .upload(path, bytes, { contentType: "image/jpeg" });
+    if (error) throw error;
+    paths.push(path);
+  }
+  return paths;
+};

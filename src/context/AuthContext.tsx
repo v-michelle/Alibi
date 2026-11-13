@@ -17,6 +17,7 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<void>;
   updateUser: (userData: Partial<User>) => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount:()=> Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -33,6 +34,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await supabase.auth.signOut();
         setUser(null);
     };
+    const deleteAccount = async () => {
+        const {
+            data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session?.user) {
+            throw new Error("No signed-in user");
+        }
+
+        const response = await fetch(
+            `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/delete-user`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({ userId: session.user.id }),
+            }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result?.error || "Failed to delete account");
+        }
+
+        await supabase.auth.signOut();
+        setUser(null);
+    };
+
     const checkSession = async () => {
         setIsLoading(true);
         try{
@@ -102,6 +134,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
     
+  
 
 
     const signIn = async (email: string, password: string) => {
@@ -177,8 +210,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 throw error;
             }
         };
+
+    
     return (
-    <AuthContext.Provider value={{ user, signUp, updateUser, isLoading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, signUp, updateUser, isLoading, signIn, signOut, deleteAccount }}>
         {children}
      </AuthContext.Provider>
     );
@@ -192,3 +227,4 @@ export const useAuth = () => {
     }
     return context;
 };
+
