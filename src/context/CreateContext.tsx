@@ -46,9 +46,9 @@ export const CreateProvider = ({ children }: { children: ReactNode }) => {
     const refresh= useCallback(async ()=>{
         setIsLoading(true);
         const{data: posts, error: postsError}= await supabase
-            .from("ailibi_posts")
+            .from("alibi_posts")
             .select("*,categories(name)")
-            .order("occured_at",{ascending:false});
+            .order("occurred_at",{ascending:false});
         const{data:categories,error:categoryError}= await supabase
             .from("categories")
           .select("id,name,group_name")
