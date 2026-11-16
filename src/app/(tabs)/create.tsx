@@ -1,12 +1,12 @@
-import { Text, View, StyleSheet, TextInput, TouchableOpacity, Alert, Modal, KeyboardAvoidingView, ScrollView } from "react-native";
+import { Text, View, StyleSheet, TextInput, TouchableOpacity, Alert, Modal, KeyboardAvoidingView, ScrollView, SectionList, FlatList } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { uploadAlibiPhotos } from "@/lib/supabase/storage";
 import DateTimePicker, { DateTimePickerChangeEvent } from '@react-native-community/datetimepicker'
 import { Ionicons } from "@expo/vector-icons";
-import { useCreate } from "@/context/CreateContext";
+import { useCreate, Category, Person } from "@/context/CreateContext";
 import { router } from "expo-router";
 
 
@@ -20,11 +20,22 @@ export default function Create() {
     const [postImage, setPostImage] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     const [photos, setPhotos] = useState<Photo[]>([]);
+
     const [modalPhotoVisible, setModalPhotoVisible] = useState(false);
     const [modalPeopleVisible, setModalPeopleVisible] = useState(false);
     const [modalCatVisible, setModalCatVisible] = useState(false);
 
-    const { addAlibi } = useCreate();
+    const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+    const [catQuery, setCatQuery] = useState("");
+    const [addingCat, setAddingCat] = useState(false);
+
+    const [selectedPeople, setSelectedPeople] = useState<Person[]>([]);
+    const [peopleQuery, setPeopleQuery] = useState("");
+    const [addingPerson, setAddingPerson] = useState(false);
+
+    const { addAlibi, categories, addCategory, people, addPerson } = useCreate();
+
+
 
     const onValueChange = (_event: DateTimePickerChangeEvent, selected: Date) => {
         setDate(selected);
@@ -97,8 +108,85 @@ export default function Create() {
             { text: "Confirm", style: 'destructive', onPress: () => setPhotos((prev) => prev.filter((_, i) => i != index)) },
         ]);
     };
+    const trimmedQuery = catQuery.trim();
+    const exactMatch = categories.find((c) => c.name.toLowerCase() === trimmedQuery.toLowerCase());
+    const canAdd = trimmedQuery.length > 0 && !exactMatch;
+
+    const catSections = useMemo(() => {
+        const query = trimmedQuery.toLowerCase();
+        const groups = new Map<string, Category[]>();
+        for (const c of categories) {
+            if (!c.name.toLowerCase().includes(query)) continue;
+            const key = c.group_name ?? "My categories";
+            groups.set(key, [...(groups.get(key) ?? []), c]);
+        }
+        const rank = (title: string) =>
+            title === "My categories" ? 0 : title === "Other" ? 2 : 1;
+        return Array.from(groups.entries()).map(([title, data]) => ({
+            title,
+            data: data.sort((a, b) => a.name.localeCompare(b.name)),
+        }))
+            .sort((a, b) => rank(a.title) - rank(b.title) || a.title.localeCompare(b.title));
+    }, [categories, catQuery]
+    );
+    const chooseCategory = (c: Category) => {
+        setSelectedCategory((prev) => (prev?.id === c.id ? null : c));
+        setModalCatVisible(false);
+    }
+
+
+    const handleAddCategory = async () => {
+        if (!canAdd || addingCat) return;
+        setAddingCat(true);
+        try {
+            const created = await addCategory(trimmedQuery);
+            setSelectedCategory(created);
+
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Please try again";
+            Alert.alert("Couldn't add category", message);
+        } finally {
+            setAddingCat(false);
+        }
+    }
+
+    const canAddPerson = peopleQuery.trim().length > 0 && !people.some((p) => p.name.toLowerCase() === peopleQuery.trim().toLowerCase());
+
+    const filteredPeople = useMemo(() => {
+        const q = peopleQuery.trim().toLowerCase();
+        return people.filter((p) => p.name.toLowerCase().includes(q));
+    }, [people, peopleQuery]);
+
+    const togglePerson = (p: Person) => {
+        setSelectedPeople((prev) =>
+            prev.some((x) => x.id === p.id) ? prev.filter((x) => x.id !== p.id) : [...prev, p]
+        );
+    };
+
+    const handleAddPerson = async () => {
+        if (!canAddPerson || addingPerson) return;
+        setAddingPerson(true);
+        try {
+            const created = await addPerson(peopleQuery.trim());
+            setSelectedPeople((prev) => [...prev, created]);
+            setPeopleQuery("");
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Please try again.";
+            Alert.alert("Couldn't add person", message);
+        } finally {
+            setAddingPerson(false);
+        }
+    };
+    const peopleSummary =
+        selectedPeople.length === 0
+            ? ""
+            : selectedPeople.length <= 2
+                ? selectedPeople.map((p) => p.name).join(", ")
+                : `${selectedPeople.length} people`;
+
 
     const handleAddAlibi = async () => {
+        if (saving) return;
         if (!title.trim()) {
             Alert.alert("Missing title", "Give your alibi a title.");
             return;
@@ -115,6 +203,8 @@ export default function Create() {
                 description: description.trim() || undefined,
                 occurred_at: date.toISOString(),
                 image_paths,
+                category_id: selectedCategory?.id ??  null,
+                person_ids: selectedPeople.map((p) => p.id),
             });
             router.back();
         } catch (error) {
@@ -182,43 +272,134 @@ export default function Create() {
                                             </TouchableOpacity>
                                         </View>
 
-                                    <ScrollView contentContainerStyle={styles.photoGrid}>
-                                        {photos.map((p, i) =>
-                                            <View key={p.uri} style={styles.photoCell}>
-                                                <Image source={{ uri: p.uri }} style={styles.photoThumb} contentFit="cover" />
-                                                <TouchableOpacity style={styles.removeBadge} onPress={() => confirmRemove(i)}>
-                                                    <Ionicons name="close" size={16} color="#fff" />
-                                                </TouchableOpacity>
-                                            </View>
-                                        )}
-                                    </ScrollView>
+                                        <ScrollView contentContainerStyle={styles.photoGrid}>
+                                            {photos.map((p, i) =>
+                                                <View key={p.uri} style={styles.photoCell}>
+                                                    <Image source={{ uri: p.uri }} style={styles.photoThumb} contentFit="cover" />
+                                                    <TouchableOpacity style={styles.removeBadge} onPress={() => confirmRemove(i)}>
+                                                        <Ionicons name="close" size={16} color="#fff" />
+                                                    </TouchableOpacity>
+                                                </View>
+                                            )}
+                                        </ScrollView>
                                     </SafeAreaView>
                                 </View>
+                            </Modal>
+
+
+                            <Modal
+                                animationType="slide"
+                                transparent={true}
+                                visible={modalCatVisible}
+                                onRequestClose={() => setModalCatVisible(false)}>
+                                <SafeAreaView style={[styles.sheet, styles.catSheet]}>
+                                    <View style={styles.sheetHeader}>
+                                        <Text> Categories </Text>
+                                        <TouchableOpacity onPress={() => setModalCatVisible(!modalCatVisible)}>
+                                            <Text style={styles.sheetDone}>Close</Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <View style={styles.searchBox}>
+                                        <Ionicons name="search-outline" size={18} color="#888" />
+                                        <TextInput
+                                            placeholder="Search or add a category"
+                                            placeholderTextColor={"#888"}
+                                            value={catQuery}
+                                            onChangeText={setCatQuery}
+                                            autoCorrect={false}
+                                            style={styles.searchInput}
+                                        />
+                                    </View>
+                                    <SectionList
+                                        sections={catSections}
+                                        keyExtractor={(c) => String(c.id)}
+                                        keyboardShouldPersistTaps="handled"
+                                        stickySectionHeadersEnabled={false}
+                                        ListHeaderComponent={
+                                            canAdd ? (
+                                                <TouchableOpacity style={styles.addRow} onPress={handleAddCategory} disabled={addingCat}>
+                                                    <Ionicons name="add-circle-outline" size={22} color="#2B3FD6" />
+                                                    <Text style={styles.addRowText}>{addingCat ? "Adding..." : `Add " ${trimmedQuery}"`}</Text>
+                                                </TouchableOpacity>
+                                            ) : undefined
+                                        }
+                                        ListEmptyComponent={
+                                            !canAdd ? <Text style={styles.emptyText}>No categories found</Text> : undefined
+                                        } renderSectionHeader={({ section }) => (
+                                            <Text style={styles.sectionHeader}>{section.title}</Text>
+                                        )}
+                                        renderItem={({ item }) => {
+                                            const selected = item.id == selectedCategory?.id;
+                                            return (
+                                                <TouchableOpacity style={styles.catRow} onPress={() => chooseCategory(item)}>
+                                                    <Text style={[styles.catRowText, selected && styles.catRowTextSelected]}>{item.name}</Text>
+                                                    {selected && <Ionicons name="checkmark" size={20} />}
+                                                </TouchableOpacity>
+                                            );
+                                        }}
+                                    />
+                                </SafeAreaView>
                             </Modal>
 
                             <Modal
                                 animationType="slide"
                                 transparent={true}
                                 visible={modalPeopleVisible}>
-                                <SafeAreaView style={styles.centeredView}>
-                                    <View style={styles.modalView}>
-                                        <Text> Modal 1 </Text>
+                                <SafeAreaView edges={["top","bottom"]} style={[styles.sheet, styles.catSheet]}>
+                                    <View style={styles.sheetHeader}>
+                                        <Text style={styles.sheetTitle}> Who did you go with? </Text>
                                         <TouchableOpacity onPress={() => setModalPeopleVisible(!modalPeopleVisible)}>
-                                            <Text>Close</Text>
+                                            <Text style={styles.sheetDone}>Close</Text>
                                         </TouchableOpacity>
-                                    </View></SafeAreaView>
-                            </Modal>
-                            <Modal
-                                animationType="slide"
-                                transparent={true}
-                                visible={modalCatVisible}>
-                                <SafeAreaView style={styles.centeredView}>
-                                    <View style={styles.modalView}>
-                                        <Text> Categories </Text>
-                                        <TouchableOpacity style={styles.modalButton} onPress={() => setModalCatVisible(!modalCatVisible)}>
-                                            <Text style={styles.modalButtonText}>X</Text>
-                                        </TouchableOpacity>
-                                    </View></SafeAreaView>
+                                    </View>
+
+                                    <View style={styles.searchBox}>
+                                        <Ionicons name="search-outline" size={18} color="#888" />
+                                        <TextInput
+                                            placeholder="Search or add a name"
+                                            placeholderTextColor="#888"
+                                            value={peopleQuery}
+                                            onChangeText={setPeopleQuery}
+                                            autoCorrect={false}
+                                            style={styles.searchInput}
+                                        />
+                                    </View>
+
+                                    <FlatList
+                                        data={filteredPeople}
+                                        keyExtractor={(p)=> String(p.id)}
+                                        keyboardShouldPersistTaps="handled"
+                                        ListHeaderComponent={
+                                            canAddPerson ? (
+                                                <TouchableOpacity style={styles.addRow} onPress={handleAddPerson} disabled={addingPerson}>
+                                                    <Ionicons name="person-add-outline" size={22}/>
+                                                    <Text style={styles.addRowText}>
+                                                        {addingPerson ? "Adding..." : `Add "${peopleQuery.trim()}"`}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ):undefined
+                                        }
+                                        ListEmptyComponent={
+                                            !canAddPerson ? (
+                                                <Text style={styles.emptyText}>
+                                                    {people.length===0
+                                                    ? "No saved people yet. Type a name to add": "No one found."}
+                                                </Text>
+                                            ):undefined
+                                        }
+                                        renderItem={({item}) =>{
+                                        const selected = selectedPeople.some((p)=> p.id===item.id);
+                                            return(
+                                                <TouchableOpacity style={styles.catRow} onPress={()=> togglePerson(item)}>
+                                                    <Text style={[styles.catRowText, selected && styles.catRowTextSelected]}>
+                                                        {item.name}
+                                                    </Text>
+                                                    <Ionicons name = {selected? "checkmark-circle": "ellipse-outline"} size={22} color={selected ? "#293edb":"#bbb"}/>
+                                                </TouchableOpacity>
+                                            );
+                                    }}/>
+                                </SafeAreaView>
                             </Modal>
 
 
@@ -232,30 +413,13 @@ export default function Create() {
                                             <Text> Upload Photo</Text>
 
                                         </View>
-                                        <Text>{photos.length} {photos.length === 1 ? "photo" : "photos"}</Text>
-                                        <Ionicons name="chevron-forward-outline" style={styles.iconArrow} />
+                                        <View style={styles.rowRight}>
+                                            <Text style={styles.countText}>{photos.length} {photos.length === 1 ? "photo" : "photos"}</Text>
+                                            <Ionicons name="chevron-forward-outline" style={styles.iconArrow} />
+                                        </View>
                                     </TouchableOpacity>
                                     {postImage && <Image source={{ uri: postImage }} style={{ width: 100, height: 100 }} />}
                                 </View>
-
-                                {/* modal pops up so user can add description??*/}
-                                <TouchableOpacity style={styles.input} >
-                                    <View style={{ flexDirection: 'row' }}>
-                                        <Ionicons name="create-outline" style={styles.icon} />
-                                        <Text> Add Description</Text>
-                                    </View>
-                                    <Ionicons name="chevron-forward-outline" style={styles.iconArrow} />
-                                </TouchableOpacity>
-
-                                {/* modal of names*/}
-                                {/*can add names or other profiles your friends with. Add new name or a past name that was saved. */}
-                                <TouchableOpacity style={styles.input} onPress={() => setModalPeopleVisible(true)}>
-                                    <View style={{ flexDirection: 'row' }}>
-                                        <Ionicons name="people-outline" style={styles.icon} />
-                                        <Text> Who did you go with?</Text>
-                                    </View>
-                                    <Ionicons name="chevron-forward-outline" style={styles.iconArrow} />
-                                </TouchableOpacity>
 
 
                                 {/*drop down menu of categories with categories to add (add new category save to user) */}
@@ -265,12 +429,47 @@ export default function Create() {
                                         <Ionicons name="pricetag-outline" style={styles.icon} />
                                         <Text> Category</Text>
                                     </View>
-                                    <Ionicons name="chevron-forward-outline" style={styles.iconArrow} />
+                                    <View style={styles.rowRight}>
+                                        {selectedCategory && <Text style={styles.countText}>{selectedCategory.name}</Text>}
+                                        <Ionicons name="chevron-forward-outline" style={styles.iconArrow} />
+                                    </View>
+
                                 </TouchableOpacity>
+                                {/* modal of names*/}
+                                {/*can add names or other profiles your friends with. Add new name or a past name that was saved. */}
+                                <TouchableOpacity style={styles.input} onPress={() => setModalPeopleVisible(true)}>
+                                    <View style={{ flexDirection: 'row' }}>
+                                        <Ionicons name="people-outline" style={styles.icon} />
+                                        <Text> Who did you go with?</Text>
+                                    </View>
+                                    <View style={styles.rowRight}>
+                                        {peopleSummary !== "" && (
+                                            <Text style={styles.countText}>{peopleSummary}</Text>
+                                        )}
+                                        <Ionicons name="chevron-forward-outline" style={styles.iconArrow} />
+                                    </View>
+
+                                </TouchableOpacity>
+                                {/* modal pops up so user can add description??*/}
+                                <View style={styles.input} >
+                                    <View style={{ flexDirection: 'row' }}>
+                                        <Ionicons name="create-outline" style={styles.icon} />
+                                        <Text> Add Description</Text>
+                                    </View>
+
+                                    <TextInput
+                                        value={description}
+                                        onChangeText={setDescription}
+                                        multiline
+                                        style={{ flex: 1, marginLeft: 6, minHeight: 60 }} />
+                                    <Ionicons name="chevron-forward-outline" style={styles.iconArrow} />
+                                </View>
 
 
-                                <TouchableOpacity style={styles.button}  >
-                                    <Text style={styles.buttonText}>Add a new alibi</Text>
+
+
+                                <TouchableOpacity style={styles.button} onPress={handleAddAlibi} disabled={saving}>
+                                    <Text style={styles.buttonText}>{saving ? "Saving..." : "Add a new alibi"}</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -396,13 +595,22 @@ const styles = StyleSheet.create({
         justifyContent: "flex-end",
         backgroundColor: "rgba(0,0,0,0.4)",
     },
+    rowRight: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+    },
+    countText: {
+        color: "#666",
+        fontSize: 14,
+    },
     sheet: {
         backgroundColor: "#fff",
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         padding: 20,
         maxHeight: "70%",
-        
+
         shadowColor: '#000',
         shadowOffset: {
             width: 0,
@@ -411,8 +619,8 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.25,
         shadowRadius: 4,
         elevation: 5,
-        
-        
+
+
     },
     sheetHeader: {
         flexDirection: "row",
@@ -428,7 +636,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: "600",
         color: "#2B3FD6",
-    }, 
+    },
     photoGrid: {
         flexDirection: "row",
         flexWrap: "wrap",
@@ -455,4 +663,64 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
     },
+    catSheet: {
+        height: "80%",
+        maxHeight: "80%",
+    },
+    searchBox: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        backgroundColor: "#F0F0F0",
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginBottom: 8,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 16,
+    },
+    sectionHeader: {
+        fontSize: 13,
+        fontWeight: "700",
+        color: "#888",
+        textTransform: "uppercase",
+        marginTop: 16,
+        marginBottom: 4,
+    },
+    catRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: "#eee",
+    },
+    catRowText: {
+        fontSize: 16,
+    },
+    catRowTextSelected: {
+        fontWeight: "700",
+        color: "#2B3FD6",
+    },
+    addRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        paddingVertical: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: "#eee",
+    },
+    addRowText: {
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#2B3FD6",
+    },
+    emptyText: {
+        textAlign: "center",
+        color: "#888",
+        marginTop: 24,
+    },
+
 });
