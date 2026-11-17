@@ -13,9 +13,10 @@ export interface Person{
 
 export interface Alibi{
    id:string;
+   created_at:string;
    title:string;
    description: string|null;
-   date:Date;
+   occurred_at: string;
    image_paths?: string[];
    category_id:number|null;
    category?: {name:string}|null;
@@ -55,7 +56,7 @@ export const CreateProvider = ({ children }: { children: ReactNode }) => {
         setIsLoading(true);
         const{data: posts, error: postsError}= await supabase
             .from("alibi_posts")
-            .select("*,categories(name), alibi_people(people(id,name))")
+            .select("*, category:categories(name), alibi_people(people(id,name))")
             .order("occurred_at",{ascending:false});
         const{data:categories,error:categoryError}= await supabase
             .from("categories")
@@ -109,9 +110,16 @@ export const CreateProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addCategory = async (name: string): Promise<Category> => {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError) throw authError;
+    if (!user) throw new Error("You need to be logged in to add a category.");
+
     const { data,error } = await supabase
       .from("categories")
-      .insert({ name: name.trim() })
+      .insert({ name: name.trim(), user_id: user.id })
       .select("id, name, group_name")
       .single();
 
