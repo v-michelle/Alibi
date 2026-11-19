@@ -25,11 +25,11 @@ export interface Alibi{
 }
 export interface NewAlibi {
   title: string;
-  description?: string;
+  description?: string |null;
   occurred_at: string;
   image_paths?: string[];
   category_id?: number | null;
-  person_ids: number[];
+  person_ids?: number[];
 }
 
 interface CreateContextType {
@@ -41,6 +41,7 @@ interface CreateContextType {
   addAlibi:(newAlibi:NewAlibi)=>Promise<void>;
   addCategory:(name:string)=>Promise<Category>;
   addPerson:(name:string) => Promise<Person>;
+  updateAlibi: (id: string, changes: NewAlibi) => Promise<void>;
 }
 
 const CreateContext = createContext<CreateContextType | undefined>(undefined);
@@ -91,7 +92,7 @@ export const CreateProvider = ({ children }: { children: ReactNode }) => {
   }, [refresh]);
 
   const addAlibi = async (newAlibi: NewAlibi) => {
-    const { person_ids, ...post } = newAlibi;
+    const { person_ids = [], ...post } = newAlibi;
     const { data, error } = await supabase
       .from("alibi_posts")
       .insert(post)
@@ -107,6 +108,27 @@ export const CreateProvider = ({ children }: { children: ReactNode }) => {
     }
 
     await refresh(); // so the home page shows the new post
+  };
+
+  const updateAlibi = async (id: string, {person_ids = [], ...changes}: NewAlibi) => {
+    const{error} = await supabase.from("alibi_posts").update(changes).eq("id",id);
+    if(error) throw error;
+
+    const current = alibis.find((a) => a.id === id)?.alibi_people?.map((ap) => ap.people.id) ?? [];
+    const toRemove = current.filter ((pid) => !person_ids.includes(pid));
+    const toAdd = person_ids.filter((pid) => !current.includes(pid));
+
+    if(toRemove.length>0){
+      const{error : delError} = await supabase
+        .from("alibi_people").delete().eq("alibi_id",id).in("person_id", toRemove);
+        if(delError) throw delError;
+    }
+    if(toAdd.length>0){
+      const {error:addError}= await supabase
+        .from("alibi_people").insert(toAdd.map((person_ids)=> ({alibi_id:id,person_ids})));
+      if(addError) throw addError;
+    }
+    await refresh();
   };
 
   const addCategory = async (name: string): Promise<Category> => {
@@ -139,7 +161,7 @@ export const CreateProvider = ({ children }: { children: ReactNode }) => {
   }
   
     return (
-    <CreateContext.Provider value={{ alibis,categories,people,refresh, isLoading,addAlibi ,addCategory,addPerson}}>
+    <CreateContext.Provider value={{ alibis,categories,people,refresh, isLoading,addAlibi ,addCategory,addPerson, updateAlibi}}>
         {children}
      </CreateContext.Provider>
     );

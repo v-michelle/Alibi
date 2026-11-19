@@ -11,6 +11,7 @@ function RouteGuard(){
   const segments = useSegments();
   const inAuthGroup= segments[0]=== "(auth)";
   const inTabsGroup= segments[0]=== "(tabs)";
+  const inEditRoute= segments[0]=== "edit";
 
   useEffect(()=>{
     if (isLoading) return;
@@ -23,11 +24,11 @@ function RouteGuard(){
         router.replace("/(auth)/onBoarding");
       }
     }else{
-      if(!inTabsGroup){
+      if(!inTabsGroup && !inEditRoute){
         router.replace("/(tabs)");
       }
     }
-  },[user,segments,router]
+  },[user,isLoading,segments,router,inAuthGroup,inTabsGroup,inEditRoute]
   );
 
   if(isLoading){
@@ -41,6 +42,7 @@ function RouteGuard(){
     
     <Stack>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="edit/[id]" options={{ presentation: "modal", headerShown: false }} />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
     </Stack>
     

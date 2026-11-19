@@ -8,7 +8,7 @@ import { Image } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
 export default function Profile() {
-  const { user, updateUser, signOut,deleteAccount } = useAuth();
+  const { user, updateUser, signOut, deleteAccount } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
   const router = useRouter();
 
@@ -59,7 +59,7 @@ export default function Profile() {
         text: "Sign Out",
         style:"destructive",
         onPress: async () => {
-          await deleteAccount();
+          await signOut();
           router.replace("/(auth)/login");
         }
       }

@@ -50,6 +50,7 @@ function usePhotoUrls(paths: string[]) {
 }
 
 function PostCard({ post }: { post: Alibi }) {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const cardWidth = width - 40; // screen minus the list's 20px side padding
   const photoHeight = cardWidth * 0.75;
@@ -107,10 +108,18 @@ function PostCard({ post }: { post: Alibi }) {
           )}
         </View>
       )}
+<TouchableOpacity
+    style={styles.editButton}
+    onPress={() => router.push({ pathname: "/edit/[id]", params: { id: String(post.id) } } as any)}
+    hitSlop={8}
+  >
+    <Ionicons name="create-outline" size={18} color="#000" />
+  </TouchableOpacity>
 
       <View style={styles.cardBody}>
-        <Text style={styles.cardTitle}>{post.title}</Text>
-
+        
+        <Text style={[styles.cardTitle, paths.length === 0 && { paddingRight: 40 }]}>{post.title}</Text>
+        {/* edit feature  */}
         <View style={styles.metaRow}>
           <Ionicons name="calendar-outline" size={16} color="#666" />
           <Text style={styles.metaText}>
@@ -415,18 +424,13 @@ export default function Index() {
         onRefresh={refresh}
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.title}>Welcome</Text>
-            <Text style={styles.subtitle}>What have you done today?</Text>
 
             <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={[styles.button, { flex: 1 }]}
-                onPress={() => router.push("/(tabs)/create")}
-              >
-                <Text style={styles.buttonText}>Add a new alibi</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.filterButton} onPress={() => setFilterVisible(true)}>
+              <View>
+                <Text style={styles.title}>Welcome</Text>
+                <Text style={styles.subtitle}>What have you done today?</Text>
+              </View>
+              <TouchableOpacity style={[styles.filterButton, {alignContent:"flex-end"}]} onPress={() => setFilterVisible(true)}>
                 <Ionicons name="options-outline" size={22} color="#000" />
                 {filterCount > 0 && (
                   <View style={styles.filterBadge}>
@@ -532,15 +536,31 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#eee",
   },
-  photoCount: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
+  editButton: {
+  position: "absolute",
+  top: 10,
+  right: 10,
+  width: 36,
+  height: 36,
+  borderRadius: 18,
+  backgroundColor: "rgba(255,255,255,0.95)",
+  alignItems: "center",
+  justifyContent: "center",
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.2,
+  shadowRadius: 3,
+  elevation: 3,
+},
+photoCount: {
+  position: "absolute",
+  bottom: 10,   // was top: 10
+  right: 10,
+  backgroundColor: "rgba(0,0,0,0.6)",
+  borderRadius: 12,
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+},
   photoCountText: {
     color: "#fff",
     fontSize: 12,
@@ -570,8 +590,10 @@ const styles = StyleSheet.create({
     color: "#222",
     lineHeight: 21,
     marginTop: 8,
-  },actionRow: {
+  },
+  actionRow: {
   flexDirection: "row",
+  justifyContent:"space-between",
   gap: 10,
 },
 filterButton: {
@@ -581,6 +603,7 @@ filterButton: {
   borderColor: "#000",
   alignItems: "center",
   justifyContent: "center",
+  height:30,
 },
 filterBadge: {
   position: "absolute",
@@ -752,4 +775,5 @@ applyText: {
   fontSize: 16,
   fontWeight: "bold",
 },
+
 });

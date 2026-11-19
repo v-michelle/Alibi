@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Button, TextInput, TouchableOpacity, Alert} from "react-native";
+import { View, Text, StyleSheet, Button, TextInput, TouchableOpacity, Alert, Image} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -32,7 +32,12 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView edges={["top","bottom"]} style={styles.container}>
+      <View style={styles.logoContent}>
+        {/*<Image source={require('../../assets//alibi_logo.png')} style={styles.logo}/>*/}
+        <Text style={styles.logoTitle}>alibi</Text>
+      </View>
     <View style={styles.content}>
+      
       <Text style={styles.title}>Login</Text>
       <Text style={styles.subtitle}>Sign in to continue</Text>
       <View style={styles.form}>
@@ -83,11 +88,30 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    marginTop:25,
   },
   content: {
     flex: 1,
-    justifyContent: "center",
     padding: 20,
+    borderWidth:1,
+    borderRadius: 15,
+    justifyContent:"center"
+
+  },
+  logoContent: {
+    alignContent: "center"
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    
+  },
+  logoTitle: {
+    alignSelf:"center",
+    fontFamily: "ui-serif",
+    fontSize: 40,
+    color: '#122454',
+    fontWeight: 500,
   },
   title: {
     fontSize: 24,
