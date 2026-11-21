@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, useMemo } from "react";
-import {Text, View,StyleSheet, TouchableOpacity,FlatList,ScrollView, Modal, ActivityIndicator, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent,} from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity, FlatList, ScrollView, Modal, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent, } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase/client";
 import { useCreate, Alibi } from "@/context/CreateContext";
-
+import { colors } from "@/lib/theme"
+import { BrandActivityIndicator, BrandLogo } from "@/components/Branding";
 import DateTimePicker from "@react-native-community/datetimepicker"
 
 const BUCKET = "alibi-photos"; // must match the bucket name you created
@@ -108,20 +109,20 @@ function PostCard({ post }: { post: Alibi }) {
           )}
         </View>
       )}
-<TouchableOpacity
-    style={styles.editButton}
-    onPress={() => router.push({ pathname: "/edit/[id]", params: { id: String(post.id) } } as any)}
-    hitSlop={8}
-  >
-    <Ionicons name="create-outline" size={18} color="#000" />
-  </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.editButton}
+        onPress={() => router.push({ pathname: "/edit/[id]", params: { id: String(post.id) } } as any)}
+        hitSlop={8}
+      >
+        <Ionicons name="create-outline" size={18} color={colors.navy} />
+      </TouchableOpacity>
 
       <View style={styles.cardBody}>
-        
+
         <Text style={[styles.cardTitle, paths.length === 0 && { paddingRight: 40 }]}>{post.title}</Text>
         {/* edit feature  */}
         <View style={styles.metaRow}>
-          <Ionicons name="calendar-outline" size={16} color="#666" />
+          <Ionicons name="calendar-outline" size={16} color={colors.inkSoft} />
           <Text style={styles.metaText}>
             {dateText} · {timeText}
           </Text>
@@ -129,14 +130,14 @@ function PostCard({ post }: { post: Alibi }) {
 
         {post.category?.name && (
           <View style={styles.metaRow}>
-            <Ionicons name="pricetag-outline" size={16} color="#666" />
+            <Ionicons name="pricetag-outline" size={16} color={colors.inkSoft} />
             <Text style={styles.metaText}>{post.category.name}</Text>
           </View>
         )}
 
         {names !== "" && (
           <View style={styles.metaRow}>
-            <Ionicons name="people-outline" size={16} color="#666" />
+            <Ionicons name="people-outline" size={16} color={colors.inkSoft} />
             <Text style={styles.metaText}>With {names}</Text>
           </View>
         )}
@@ -208,6 +209,7 @@ function DateRow({
             mode="date"
             maximumDate={new Date()}
             onValueChange={(_e, d) => onChange(d)}
+            accentColor={colors.navy}
           />
         ) : (
           <TouchableOpacity onPress={() => onChange(new Date())}>
@@ -216,7 +218,7 @@ function DateRow({
         )}
         {value && (
           <TouchableOpacity onPress={() => onChange(null)} >
-            <Ionicons name="close-circle" size={20} color="#aaa" />
+            <Ionicons name="close-circle" size={20} color={colors.inkSoft} />
           </TouchableOpacity>
         )}
       </View>
@@ -266,7 +268,7 @@ function FilterSheet({
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <SafeAreaView edges={["bottom"]} style={styles.sheet}>
+        <SafeAreaView edges={["top", "bottom"]} style={styles.sheet}>
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>Filter</Text>
             <TouchableOpacity onPress={onClose}>
@@ -407,7 +409,7 @@ export default function Index() {
   if (isLoading && alibis.length === 0) {
     return (
       <SafeAreaView style={[styles.container, styles.center]} edges={["top", "bottom"]}>
-        <ActivityIndicator />
+        <BrandActivityIndicator size={54} />
       </SafeAreaView>
     );
   }
@@ -425,13 +427,10 @@ export default function Index() {
         ListHeaderComponent={
           <View style={styles.header}>
 
-            <View style={styles.actionRow}>
-              <View>
-                <Text style={styles.title}>Welcome</Text>
-                <Text style={styles.subtitle}>What have you done today?</Text>
-              </View>
-              <TouchableOpacity style={[styles.filterButton, {alignContent:"flex-end"}]} onPress={() => setFilterVisible(true)}>
-                <Ionicons name="options-outline" size={22} color="#000" />
+            <View style={styles.brandHeader}>
+              <BrandLogo compact />
+              <TouchableOpacity style={styles.filterButton} onPress={() => setFilterVisible(true)}>
+                <Ionicons name="options-outline" size={22} color={colors.navy} />
                 {filterCount > 0 && (
                   <View style={styles.filterBadge}>
                     <Text style={styles.filterBadgeText}>{filterCount}</Text>
@@ -439,6 +438,8 @@ export default function Index() {
                 )}
               </TouchableOpacity>
             </View>
+            <Text style={styles.title}>Welcome</Text>
+            <Text style={styles.subtitle}>What have you done today?</Text>
 
             {filterCount > 0 && (
               <View style={styles.resultsRow}>
@@ -483,6 +484,7 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.parchment
   },
   center: {
     alignItems: "center",
@@ -496,37 +498,44 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    fontSize: 24,
+    fontFamily: 'ui-serif',
+    fontSize: 32,
     fontWeight: "bold",
-    marginBottom: 8,
+    color: colors.navy,
+    marginBottom: 6,
   },
   subtitle: {
+    fontFamily: 'ui-serif',
     fontSize: 16,
-    color: "#666",
+    color: colors.inkSoft,
     marginBottom: 20,
   },
   button: {
-    backgroundColor: "#000000",
+    backgroundColor: colors.navy,
     borderRadius: 12,
     padding: 12,
     alignItems: "center",
   },
   buttonText: {
-    color: "#fff",
+    color: colors.parchment,
     fontSize: 16,
     fontWeight: "bold",
   },
   emptyText: {
     textAlign: "center",
-    color: "#888",
+    color: colors.inkSoft,
     marginTop: 20,
+    fontFamily: 'ui-serif',
+    fontStyle: 'italic',
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.card,
     borderRadius: 20,
     overflow: "hidden",
     marginBottom: 20,
-    shadowColor: "#000",
+    borderWidth: 1,
+    borderColor: colors.paper,
+    shadowColor: colors.navy,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 6,
@@ -534,46 +543,50 @@ const styles = StyleSheet.create({
   },
   photoPlaceholder: {
     flex: 1,
-    backgroundColor: "#eee",
+    backgroundColor: colors.paper,
   },
-  editButton: {
-  position: "absolute",
-  top: 10,
-  right: 10,
-  width: 36,
-  height: 36,
-  borderRadius: 18,
-  backgroundColor: "rgba(255,255,255,0.95)",
-  alignItems: "center",
-  justifyContent: "center",
-  shadowColor: "#000",
-  shadowOffset: { width: 0, height: 1 },
-  shadowOpacity: 0.2,
-  shadowRadius: 3,
-  elevation: 3,
-},
-photoCount: {
-  position: "absolute",
-  bottom: 10,   // was top: 10
-  right: 10,
-  backgroundColor: "rgba(0,0,0,0.6)",
-  borderRadius: 12,
-  paddingHorizontal: 10,
-  paddingVertical: 4,
-},
+  photoCount: {
+    position: "absolute",
+    bottom: 10,   // was top: 10
+    right: 10,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
   photoCountText: {
-    color: "#fff",
+    color: colors.parchment,
     fontSize: 12,
     fontWeight: "600",
+  },
+  editButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.parchment,
+    borderWidth:1,
+    borderColor: colors.gold,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: colors.navy,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   cardBody: {
     padding: 16,
     gap: 6,
   },
   cardTitle: {
+    fontFamily: "ui-serif",
     fontSize: 20,
     fontWeight: "700",
     marginBottom: 4,
+    color: colors.navy
   },
   metaRow: {
     flexDirection: "row",
@@ -582,198 +595,211 @@ photoCount: {
   },
   metaText: {
     fontSize: 14,
-    color: "#555",
+    color: colors.inkSoft,
     flexShrink: 1,
   },
   description: {
+    fontFamily: "ui-serif",
     fontSize: 15,
-    color: "#222",
-    lineHeight: 21,
+    color: colors.navy,
+    lineHeight: 22,
     marginTop: 8,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.paper,
   },
-  actionRow: {
-  flexDirection: "row",
-  justifyContent:"space-between",
-  gap: 10,
-},
-filterButton: {
-  width: 48,
-  borderRadius: 12,
-  borderWidth: 1.5,
-  borderColor: "#000",
-  alignItems: "center",
-  justifyContent: "center",
-  height:30,
-},
-filterBadge: {
-  position: "absolute",
-  top: -6,
-  right: -6,
-  minWidth: 20,
-  height: 20,
-  borderRadius: 10,
-  backgroundColor: "#2B3FD6",
-  alignItems: "center",
-  justifyContent: "center",
-  paddingHorizontal: 4,
-},
-filterBadgeText: {
-  color: "#fff",
-  fontSize: 12,
-  fontWeight: "700",
-},
-resultsRow: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginTop: 14,
-},
-resultsText: {
-  color: "#666",
-  fontSize: 14,
-},
-clearLink: {
-  color: "#2B3FD6",
-  fontSize: 14,
-  fontWeight: "600",
-},
-backdrop: {
-  flex: 1,
-  justifyContent: "flex-end",
-  backgroundColor: "rgba(0,0,0,0.4)",
-},
-sheet: {
-  backgroundColor: "#fff",
-  borderTopLeftRadius: 20,
-  borderTopRightRadius: 20,
-  padding: 20,
-  height: "85%",
-},
-sheetHeader: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginBottom: 8,
-},
-sheetTitle: {
-  fontSize: 20,
-  fontWeight: "700",
-},
-sheetClose: {
-  fontSize: 16,
-  fontWeight: "600",
-  color: "#2B3FD6",
-},
-sectionLabel: {
-  fontSize: 13,
-  fontWeight: "700",
-  color: "#888",
-  textTransform: "uppercase",
-  marginTop: 20,
-  marginBottom: 10,
-},
-segmented: {
-  flexDirection: "row",
-  backgroundColor: "#F0F0F0",
-  borderRadius: 12,
-  padding: 3,
-},
-segment: {
-  flex: 1,
-  paddingVertical: 10,
-  borderRadius: 10,
-  alignItems: "center",
-},
-segmentActive: {
-  backgroundColor: "#fff",
-  shadowColor: "#000",
-  shadowOffset: { width: 0, height: 1 },
-  shadowOpacity: 0.1,
-  shadowRadius: 2,
-  elevation: 2,
-},
-segmentText: {
-  fontSize: 15,
-  color: "#666",
-},
-segmentTextActive: {
-  color: "#000",
-  fontWeight: "600",
-},
-dateRow: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  paddingVertical: 10,
-  borderBottomWidth: 1,
-  borderBottomColor: "#eee",
-},
-dateRowLabel: {
-  fontSize: 16,
-},
-dateRowRight: {
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 8,
-},
-anyText: {
-  fontSize: 16,
-  color: "#2B3FD6",
-},
-chipWrap: {
-  flexDirection: "row",
-  flexWrap: "wrap",
-  gap: 8,
-},
-chip: {
-  paddingHorizontal: 14,
-  paddingVertical: 8,
-  borderRadius: 999,
-  backgroundColor: "#F0F0F0",
-},
-chipSelected: {
-  backgroundColor: "#2B3FD6",
-},
-chipText: {
-  fontSize: 14,
-  color: "#222",
-},
-chipTextSelected: {
-  color: "#fff",
-  fontWeight: "600",
-},
-hintText: {
-  color: "#888",
-  fontSize: 14,
-},
-footer: {
-  flexDirection: "row",
-  gap: 10,
-  paddingTop: 12,
-},
-resetButton: {
-  flex: 1,
-  borderRadius: 12,
-  borderWidth: 1.5,
-  borderColor: "#ccc",
-  padding: 12,
-  alignItems: "center",
-},
-resetText: {
-  fontSize: 16,
-  fontWeight: "600",
-},
-applyButton: {
-  flex: 2,
-  borderRadius: 12,
-  backgroundColor: "#000",
-  padding: 12,
-  alignItems: "center",
-},
-applyText: {
-  color: "#fff",
-  fontSize: 16,
-  fontWeight: "bold",
-},
+  brandHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 18,
+  },
+  filterButton: {
+    width: 48,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.navy,
+    alignItems: "center",
+    justifyContent: "center",
+    height: 42,
+  },
+  filterBadge: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.gold,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  filterBadgeText: {
+    color: colors.navy,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  resultsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 14,
+  },
+  resultsText: {
+    color: colors.inkSoft,
+    fontSize: 14,
+  },
+  clearLink: {
+    color: colors.navy,
+    fontSize: 14,
+    fontWeight: "600",
+    textDecorationLine: "underline"
+  },
+  backdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.4)",
+    color: colors.scrim
+  },
+  sheet: {
+    backgroundColor: colors.parchment,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    height: "85%",
+  },
+  sheetHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  sheetTitle: {
+    fontFamily: 'ui-serif',
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.navy,
+  },
+  sheetClose: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.navy,
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.inkSoft,
+    textTransform: "uppercase",
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  segmented: {
+    flexDirection: "row",
+    backgroundColor: colors.paper,
+    borderRadius: 12,
+    padding: 3,
+  },
+  segment: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  segmentActive: {
+    backgroundColor: colors.card,
+    shadowColor: colors.navy,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  segmentText: {
+    fontSize: 15,
+    color: colors.inkSoft,
+  },
+  segmentTextActive: {
+    color: colors.navy,
+    fontWeight: "600",
+  },
+  dateRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.paper,
+  },
+  dateRowLabel: {
+    fontFamily: 'ui-serif',
+    fontSize: 16,
+    color: colors.navy
+  },
+  dateRowRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  anyText: {
+    fontSize: 16,
+    color: colors.navy,
+  },
+  chipWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: colors.paper,
+  },
+  chipSelected: {
+    backgroundColor: colors.navy,
+  },
+  chipText: {
+    fontSize: 14,
+    color: colors.navy,
+  },
+  chipTextSelected: {
+    color: colors.parchment,
+    fontWeight: "600",
+  },
+  hintText: {
+    color: colors.inkSoft,
+    fontSize: 14,
+  },
+  footer: {
+    flexDirection: "row",
+    gap: 10,
+    paddingTop: 12,
+  },
+  resetButton: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.gold,
+    padding: 12,
+    alignItems: "center",
+  },
+  resetText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.navy,
+  },
+  applyButton: {
+    flex: 2,
+    borderRadius: 12,
+    backgroundColor: colors.navy,
+    padding: 12,
+    alignItems: "center",
+  },
+  applyText: {
+    color: colors.parchment,
+    fontSize: 16,
+    fontWeight: "bold",
+  },
 
 });

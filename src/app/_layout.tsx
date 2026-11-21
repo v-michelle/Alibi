@@ -3,8 +3,10 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { CreateProvider } from "@/context/CreateContext";
 import { Stack, useRouter,useSegments } from "expo-router";
 import { useEffect } from "react";
-import { ActivityIndicator , View} from "react-native";
-
+import { View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { colors } from "@/lib/theme";
+import { BrandActivityIndicator } from "@/components/Branding";
 function RouteGuard(){
   const router= useRouter();
   const {user, isLoading}= useAuth();
@@ -33,14 +35,14 @@ function RouteGuard(){
 
   if(isLoading){
     return(
-      <View>
-        <ActivityIndicator/>
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.parchment }}>
+        <BrandActivityIndicator />
       </View>
     );
   }
     return (
     
-    <Stack>
+    <Stack screenOptions={{ contentStyle: { backgroundColor: colors.parchment } }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="edit/[id]" options={{ presentation: "modal", headerShown: false }} />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -53,11 +55,13 @@ function RouteGuard(){
 
 export default function RootLayout() {
   return(
-    <AuthProvider>
-      <CreateProvider>
-        <RouteGuard />
-      </CreateProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <CreateProvider>
+          <RouteGuard />
+        </CreateProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   )
 
 

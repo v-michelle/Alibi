@@ -8,17 +8,19 @@ import {
     Alert,
     Modal,
     KeyboardAvoidingView,
+    Platform,
     FlatList,
     ScrollView,
     SectionList,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
-import DateTimePicker, { DateTimePickerChangeEvent } from "@react-native-community/datetimepicker";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { Category, Person, useCreate } from "@/context/CreateContext";
-
+import { colors } from "@/lib/theme";
+import { BrandLogo } from "./Branding";
 export type FormPhoto = { uri: string; path?: string };
 
 export type AlibiFormValues = {
@@ -37,6 +39,7 @@ type AlibiFormProps = {
     initial?: Partial<AlibiFormValues>;
     onSubmit: (values: AlibiFormValues) => Promise<void>;
     onCancel?: () => void;
+    onDelete?: () => Promise<void>;
 };
 
 const MAX_PHOTOS = 5;
@@ -94,7 +97,7 @@ function usePhotoPicker(initial: FormPhoto[]) {
     };
 
     const removePhoto = (index: number) =>
-    setPhotos((prev) => prev.filter((_, i) => i !== index));
+        setPhotos((prev) => prev.filter((_, i) => i !== index));
     return { photos, showImagePicker, removePhoto }
 }
 
@@ -111,9 +114,9 @@ function FormRow({
 }) {
     return (
         <TouchableOpacity style={styles.input} onPress={onPress}>
-            <View style={{ flexDirection: "row" }}>
+            <View style={styles.rowLead}>
                 <Ionicons name={icon} style={styles.icon} />
-                <Text>{label}</Text>
+                <Text style={styles.rowLabel}>{label}</Text>
             </View>
             <View style={styles.rowRight}>
                 {!!value && (
@@ -130,20 +133,22 @@ function FormRow({
 function DateField({ date, onChange }: { date: Date; onChange: (d: Date) => void }) {
     return (
         <View style={styles.input}>
-            <View style={{ flexDirection: "row" }}>
+            <View style={styles.rowLead}>
                 <Ionicons name="calendar-outline" style={styles.icon} />
-                <Text>Date</Text>
+                <Text style={styles.rowLabel}>Date</Text>
             </View>
             <View style={styles.dateTime}>
                 <DateTimePicker
                     value={date}
                     mode="date"
+                    accentColor={colors.navy}
                     maximumDate={new Date()}
                     onValueChange={(_e, selected) => onChange(selected)}
                 />
                 <DateTimePicker
                     value={date}
                     mode="time"
+                    accentColor={colors.navy}
                     onValueChange={(_e, selected) => onChange(selected)}
                 />
             </View>
@@ -164,7 +169,22 @@ function PhotoSheet({
     onRemove: (index: number) => void;
     onAddMore: () => void;
 }) {
-    const confirmRemove = (index: number) => {
+    const [viewerIndex, setViewerIndex] = useState<number | null>(null); // null = viewer closed
+    const [page, setPage] = useState(0); // photo currently showing in the viewer
+    const [pager, setPager] = useState({ width: 0, height: 0 });
+
+    const openViewer = (index: number) => {
+        setPage(index);
+        setViewerIndex(index);
+    };
+    const closeViewer = () => setViewerIndex(null);
+    const close = () => {
+        setViewerIndex(null);
+        onClose();
+    };
+
+
+    const confirmRemove = (index: number, afterRemove?: () => void) => {
         Alert.alert(
             "Are you sure you want to delete this photo?",
             "This photo will be permanently deleted from your account.",
@@ -173,7 +193,10 @@ function PhotoSheet({
                 {
                     text: "Confirm",
                     style: "destructive",
-                    onPress: () => onRemove(index),
+                    onPress: () => {
+                        onRemove(index);
+                        afterRemove?.();
+                    },
                 },
             ],
         );
@@ -183,20 +206,27 @@ function PhotoSheet({
             animationType="slide"
             transparent
             visible={visible}
-            onRequestClose={onClose}
+            statusBarTranslucent
+            onRequestClose={viewerIndex !== null ? closeViewer : close}
         >
-            <View style={styles.backdrop}>
-                <SafeAreaView edges={["bottom"]} style={styles.sheet}>
+            <SafeAreaProvider style={styles.fullScreen}>
+              <View style={styles.fullScreen}>
+                <SafeAreaView edges={["top", "bottom"]} style={styles.fullSheet}>
                     <View style={styles.sheetHeader}>
                         <Text style={styles.sheetTitle}>Your photos</Text>
-                        <TouchableOpacity onPress={onClose}>
+                        <TouchableOpacity onPress={close}>
                             <Text style={styles.sheetDone}>Done</Text>
                         </TouchableOpacity>
                     </View>
-
-                    <ScrollView contentContainerStyle={styles.photoGrid}>
+                    {photos.length > 0 && <Text style={styles.photoHint}>Tap a photo to view it larger</Text>}
+                    <ScrollView contentContainerStyle={styles.photoGrid} showsVerticalScrollIndicator={false}>
                         {photos.map((photo, index) => (
-                            <View key={photo.path ?? photo.uri} style={styles.photoCell}>
+                            <TouchableOpacity
+                                key={photo.path ?? photo.uri}
+                                style={styles.photoCell}
+                                activeOpacity={0.85}
+                                onPress={() => openViewer(index)}
+                            >
                                 <Image
                                     source={{ uri: photo.uri }}
                                     style={styles.photoThumb}
@@ -208,16 +238,76 @@ function PhotoSheet({
                                 >
                                     <Ionicons name="close" size={16} color="#fff" />
                                 </TouchableOpacity>
-                            </View>
+                            </TouchableOpacity>
                         ))}
                         {photos.length < MAX_PHOTOS && (
                             <TouchableOpacity style={[styles.photoCell, styles.addTile]} onPress={onAddMore}>
-                                <Ionicons name="add" size={32} color="#666" />
+                                <Ionicons name="add" size={32} color={colors.inkSoft} />
+                                <Text style={styles.addTitleText}>Add photos</Text>
                             </TouchableOpacity>
                         )}
                     </ScrollView>
                 </SafeAreaView>
-            </View>
+                {viewerIndex !== null && (
+                    <View style={[StyleSheet.absoluteFill, styles.viewer]}>
+                        <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1 }}>
+                            <View style={styles.viewerBar}>
+                                <TouchableOpacity onPress={closeViewer} hitSlop={12} accessibilityLabel="Close photo">
+                                    <Ionicons name="chevron-back" size={28} color={colors.parchment} />
+                                </TouchableOpacity>
+                                <Text style={styles.viewerCount}>
+                                    {page + 1} / {photos.length}
+                                </Text>
+                                <TouchableOpacity onPress={() => confirmRemove(page, closeViewer)} hitSlop={12} accessibilityLabel="Delete photo">
+                                    <Ionicons name="trash-outline" size={24} color={colors.parchment} />
+                                </TouchableOpacity>
+                            </View>
+
+                            <View
+                                style={{ flex: 1 }}
+                                onLayout={(e) =>
+                                    setPager({
+                                        width: e.nativeEvent.layout.width,
+                                        height: e.nativeEvent.layout.height,
+                                    })
+                                }
+                            >
+                                {pager.width > 0 && (
+                                    <ScrollView
+                                        horizontal
+                                        pagingEnabled
+                                        showsHorizontalScrollIndicator={false}
+                                        contentOffset={{ x: viewerIndex * pager.width, y: 0 }}
+                                        onMomentumScrollEnd={(e) =>
+                                            setPage(Math.round(e.nativeEvent.contentOffset.x / pager.width))
+                                        }
+                                    >
+                                        {photos.map((p) => (
+                                            <ScrollView
+                                                key={p.path ?? p.uri}
+                                                style={{ width: pager.width, height: pager.height }}
+                                                contentContainerStyle={{ width: pager.width, height: pager.height }}
+                                                maximumZoomScale={3}
+                                                minimumZoomScale={1}
+                                                centerContent
+                                                showsHorizontalScrollIndicator={false}
+                                                showsVerticalScrollIndicator={false}
+                                            >
+                                                <Image
+                                                    source={{ uri: p.uri }}
+                                                    style={{ width: pager.width, height: pager.height }}
+                                                    contentFit="contain"
+                                                />
+                                            </ScrollView>
+                                        ))}
+                                    </ScrollView>
+                                )}
+                            </View>
+                        </SafeAreaView>
+                    </View>
+                )}
+              </View>
+            </SafeAreaProvider>
         </Modal>
     );
 };
@@ -295,8 +385,9 @@ function CategorySheet({
             visible={visible}
             onRequestClose={close}
         ><KeyboardAvoidingView
-            style={styles.backdrop}>
-                <SafeAreaView edges={["bottom"]} style={[styles.sheet, styles.tallSheet]}>
+            style={styles.backdrop}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}>
+                <SafeAreaView edges={["top", "bottom"]} style={[styles.sheet, styles.tallSheet]}>
                     <View style={styles.sheetHeader}>
                         <Text style={styles.sheetTitle}>Categories</Text>
                         <TouchableOpacity onPress={close}>
@@ -305,10 +396,10 @@ function CategorySheet({
                     </View>
 
                     <View style={styles.searchBox}>
-                        <Ionicons name="search-outline" size={18} color="#888" />
+                        <Ionicons name="search-outline" size={18} color={colors.inkSoft} />
                         <TextInput
                             placeholder="Search or add a category"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={colors.inkSoft}
                             value={query}
                             onChangeText={setQuery}
                             autoCorrect={false}
@@ -327,7 +418,7 @@ function CategorySheet({
                                     onPress={handleAdd}
                                     disabled={adding}
                                 >
-                                    <Ionicons name="add-circle-outline" size={22} color="#2B3FD6" />
+                                    <Ionicons name="add-circle-outline" size={22} color={colors.navy} />
                                     <Text style={styles.addRowText}>
                                         {adding ? "Adding..." : `Add "${trimmedQuery}"`}
                                     </Text>
@@ -351,10 +442,10 @@ function CategorySheet({
                                     style={styles.listRow}
                                     onPress={() => choose(item)}
                                 >
-                                    <Text style={[styles.listRowText, selected && styles.listRowTextSelected,]}>
+                                    <Text style={[styles.listRowText, isSelected && styles.listRowTextSelected,]}>
                                         {item.name}
                                     </Text>
-                                    {isSelected && <Ionicons name="checkmark" size={20} color="#2B3FD6" />}
+                                    {isSelected && <Ionicons name="checkmark" size={20} color={colors.navy} />}
                                 </TouchableOpacity>
                             );
                         }}
@@ -418,24 +509,24 @@ function PeopleSheet({
             transparent
             visible={visible}
             onRequestClose={close}
-        ><KeyboardAvoidingView style={styles.backdrop}>
+        ><KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === "ios" ? "padding" : undefined}>
 
                 <SafeAreaView
                     edges={["top", "bottom"]}
                     style={[styles.sheet, styles.tallSheet]}
                 >
                     <View style={styles.sheetHeader}>
-                        <Text style={styles.sheetTitle}>Who did you go with?</Text>
+                        <Text style={styles.sheetTitle}>People</Text>
                         <TouchableOpacity onPress={close}>
                             <Text style={styles.sheetDone}>Done</Text>
                         </TouchableOpacity>
                     </View>
 
                     <View style={styles.searchBox}>
-                        <Ionicons name="search-outline" size={18} color="#888" />
+                        <Ionicons name="search-outline" size={18} color={colors.inkSoft} />
                         <TextInput
                             placeholder="Search or add a name"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={colors.inkSoft}
                             value={query}
                             onChangeText={setQuery}
                             autoCorrect={false}
@@ -454,7 +545,7 @@ function PeopleSheet({
                                     onPress={handleAdd}
                                     disabled={adding}
                                 >
-                                    <Ionicons name="person-add-outline" size={22} color="#2B3FD6" />
+                                    <Ionicons name="person-add-outline" size={22} color={colors.navy} />
                                     <Text style={styles.addRowText}>
                                         {adding
                                             ? "Adding..."
@@ -478,7 +569,7 @@ function PeopleSheet({
                             );
                             return (
                                 <TouchableOpacity style={styles.listRow} onPress={() => toggle(item)} >
-                                    <Text style={[styles.listRowText, selected && styles.listRowTextSelected,]}>
+                                    <Text style={[styles.listRowText, isSelected && styles.listRowTextSelected,]}>
                                         {item.name}
                                     </Text>
                                     <Ionicons
@@ -488,7 +579,7 @@ function PeopleSheet({
                                                 : "ellipse-outline"
                                         }
                                         size={22}
-                                        color={selected ? "#293edb" : "#bbb"}
+                                        color={selected ? colors.navy : colors.gold}
                                     />
                                 </TouchableOpacity>
                             );
@@ -507,6 +598,7 @@ export default function AlibiForm({
     initial,
     onSubmit,
     onCancel,
+    onDelete
 }: AlibiFormProps) {
     // Form values (initial values are only read on the first render)
     const [title, setTitle] = useState(initial?.title ?? "");
@@ -516,7 +608,7 @@ export default function AlibiForm({
     const [selectedPeople, setSelectedPeople] = useState<Person[]>(initial?.people ?? []);
     const { photos, showImagePicker, removePhoto } = usePhotoPicker(initial?.photos ?? []);
     const [saving, setSaving] = useState(false);
-
+    const [deleting, setDeleting] = useState(false);
     // Which modal is open
     const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
     const [peopleSheetOpen, setPeopleSheetOpen] = useState(false);
@@ -565,13 +657,35 @@ export default function AlibiForm({
             setSaving(false);
         }
     };
+    const confirmDelete = () => {
+        Alert.alert("Delete this alibi?", "This permanently deletes it and cannot be recovered",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete", style: "destructive",
+                    onPress: async () => {
+                        setDeleting(true);
+                        try {
+                            await onDelete?.();
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Please try again";
+                            Alert.alert("Couldn't delete", message);
+                            setDeleting(false);
+                        }
+                    },
+                },
+            ]
+        );
+    };
     return (
         <>
             <SafeAreaView edges={["top", "bottom"]} style={styles.screen}>
-                <KeyboardAvoidingView style={{ flex: 1 }} >
+                <KeyboardAvoidingView style={{ flex: 1 }} 
+                behavior={Platform.OS === "ios" ? "padding" : undefined}>
                     <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                        <View style={styles.headerRow}>
-                            <View style={{ flex: 1 }}>
+
+                        <View style={styles.header}>
+                            <View >
                                 <Text style={styles.title}>{heading}</Text>
                                 {subheading ? <Text style={styles.subtitle}>{subheading}</Text> : null}
                             </View>
@@ -584,7 +698,7 @@ export default function AlibiForm({
                         <View style={styles.container}>
                             <TextInput
                                 placeholder="Enter title"
-                                placeholderTextColor="#000000c3"
+                                placeholderTextColor={colors.inkSoft}
                                 value={title}
                                 onChangeText={setTitle}
                                 style={styles.inputText}
@@ -598,22 +712,11 @@ export default function AlibiForm({
                                 value={photosSummary}
                                 onPress={onPhotoRowPress}
                             />
-
-                            <View style={[styles.input, { alignItems: "flex-start" }]}>
-                                <Ionicons name="create-outline" style={styles.icon} />
-                                <TextInput
-                                    placeholder="Add description"
-                                    placeholderTextColor="#000000c3"
-                                    value={description}
-                                    onChangeText={setDescription}
-                                    multiline
-                                    style={styles.descInput}
-                                />
-                            </View>
+                    
 
                             <FormRow
                                 icon="people-outline"
-                                label="Who did you go with?"
+                                label="Who was there?"
                                 value={peopleSummary}
                                 onPress={() => setPeopleSheetOpen(true)}
                             />
@@ -624,10 +727,27 @@ export default function AlibiForm({
                                 value={category?.name}
                                 onPress={() => setCategorySheetOpen(true)}
                             />
+                            <View style={[styles.input, { alignItems: "flex-start" }]}>
+                                <Ionicons name="create-outline" style={styles.icon} />
+                                <TextInput
+                                    placeholder="Add description"
+                                    placeholderTextColor={colors.inkSoft}
+                                    value={description}
+                                    onChangeText={setDescription}
+                                    multiline
+                                    style={styles.descInput}
+                                />
+                            </View>
 
-                            <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={saving}>
+                            <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={saving || deleting}>
                                 <Text style={styles.buttonText}>{saving ? "Saving..." : submitLabel}</Text>
                             </TouchableOpacity>
+                            {onDelete && (
+                                <TouchableOpacity style={styles.deleteButton} onPress={confirmDelete} disabled={saving || deleting}>
+                                    <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                                    <Text style={styles.deleteText}>{deleting ? "Deleting..." : "Delete alibi"}</Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
                     </ScrollView>
                 </KeyboardAvoidingView>
@@ -659,129 +779,224 @@ export default function AlibiForm({
 }
 
 const styles = StyleSheet.create({
-  // --- Page ---
-  screen: { flex: 1, padding: 20 },
-  headerRow: { flexDirection: "row", alignItems: "flex-start" },
-  title: { fontSize: 24, fontWeight: "bold" },
-  subtitle: { fontSize: 16, color: "#666", marginBottom: 20 },
-  cancelText: { fontSize: 16, fontWeight: "600", color: "#2B3FD6" },
-  container: { borderRadius: 20, backgroundColor: "#ffffff", padding: 20, marginTop: 8 },
-
-  // --- Rows ---
-  icon: { color: "black", fontSize: 25 },
-  iconArrow: { color: "grey", fontSize: 20 },
-  inputText: {
-    fontSize: 25,
-    fontWeight: "700",
-    padding: 10,
-    fontStyle: "italic",
-    borderBottomWidth: 1,
-    borderBottomColor: "#ccc",
-  },
-  input: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#ccc",
-    padding: 10,
+    // --- Page ---
+    screen: {
+        flex: 1,
+        padding: 30,
+        backgroundColor: colors.parchment
+    },
+    header: {
+        flexDirection: "row",
+        justifyContent:'space-between',
+        alignItems: "flex-start",
+        marginBottom:20
+    },
+    brandHeader: {
+        gap:10,
+        marginBottom:18,
+    },
+    title: {
+        fontFamily: 'ui-serif',
+    fontSize: 32,
+    fontWeight: "bold",
+    color: colors.navy,
+    marginBottom: 6,
+    },
+    subtitle: {
+        fontFamily: 'ui-serif',
     fontSize: 16,
-    marginBottom: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  descInput: {
-    flex: 1,
-    marginLeft: 8,
-    minHeight: 60,
-    fontSize: 16,
-    textAlignVertical: "top",
-  },
-  dateTime: { flexDirection: "row" },
-  rowRight: { flexDirection: "row", alignItems: "center", gap: 6 },
-  countText: { color: "#666", fontSize: 14 },
+    color: colors.inkSoft,
+    
+    },
+    cancelText: {
+        fontSize: 16,
+        fontWeight: "600",
+        color: colors.navy
+    },
+    container: {
+        borderRadius: 16,
+        backgroundColor: colors.card,
+        padding: 20,
+        
+        borderWidth: 1,
+        borderColor: colors.paper,
+    },
 
-  // --- Save button ---
-  button: {
-    backgroundColor: "#000000",
-    borderRadius: 12,
-    padding: 10,
-    alignItems: "center",
-    margin: 10,
-  },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
 
-  // --- Sheets (shared by all three modals) ---
-  backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" },
-  sheet: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: "70%",
-  },
-  tallSheet: { height: "80%", maxHeight: "80%" },
-  sheetHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  sheetTitle: { fontSize: 18, fontWeight: "700" },
-  sheetDone: { fontSize: 16, fontWeight: "600", color: "#2B3FD6" },
+    // --- Rows ---
+    icon: {
+        color: colors.navy,
+        fontSize: 25
+    },
+    iconArrow: {
+        color: colors.inkSoft,
+        fontSize: 20
+    },
+    rowLabel: {
+        fontFamily: 'ui-serif',
+        fontSize: 16,
+        color: colors.navy
+    },
+    inputText: {
+        fontSize: 25,
+        fontWeight: "700",
+        padding: 10,
+        fontStyle: "italic",
+        borderBottomWidth: 1,
+        borderBottomColor: colors.gold,
+    },
+    input: {
+        borderBottomWidth: 1,
+        borderBottomColor: colors.paper,
+        padding: 10,
+        fontSize: 16,
+        marginBottom: 10,
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+    },
+    rowLead: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+    },
+    descInput: {
+        flex: 1,
+        marginLeft: 8,
+        minHeight: 60,
+        fontFamily: "ui-serif",
+        fontSize: 16,
+        color: colors.navy,
+        textAlignVertical: "top",
+    },
+    dateTime: { flexDirection: "row" },
+    rowRight: { flexDirection: "row", alignItems: "center", gap: 6 },
+    countText: { color: colors.inkSoft, fontSize: 14 },
 
-  // --- Photo sheet ---
-  photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingBottom: 10 },
-  photoCell: { width: "31%", aspectRatio: 1, borderRadius: 12, overflow: "hidden" },
-  photoThumb: { width: "100%", height: "100%" },
-  removeBadge: {
-    position: "absolute",
-    top: 6,
-    right: 6,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.65)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  addTile: { backgroundColor: "#F0F0F0", alignItems: "center", justifyContent: "center" },
+    // --- Save button ---
+    button: {
+        backgroundColor: colors.navy,
+        borderRadius: 12,
+        padding: 10,
+        alignItems: "center",
+        margin: 10,
+    },
+    buttonText: { color: colors.parchment, fontSize: 16, fontWeight: "bold" },
+    deleteButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        padding: 12,
+        marginHorizontal: 10,
+    },
+    deleteText: { color: colors.danger, fontSize: 16, fontWeight: "600" },
 
-  // --- Category and people sheets ---
-  searchBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#F0F0F0",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 8,
-  },
-  searchInput: { flex: 1, fontSize: 16 },
-  sectionHeader: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#888",
-    textTransform: "uppercase",
-    marginTop: 16,
-    marginBottom: 4,
-  },
-  listRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  listRowText: { fontSize: 16 },
-  listRowTextSelected: { fontWeight: "700", color: "#2B3FD6" },
-  addRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  addRowText: { fontSize: 16, fontWeight: "600", color: "#2B3FD6" },
-  emptyText: { textAlign: "center", color: "#888", marginTop: 24 },
+
+    // --- Sheets (shared by all three modals) ---
+    backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: colors.scrim },
+    sheet: {
+        backgroundColor: colors.parchment,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 20,
+        maxHeight: "70%",
+    },
+    tallSheet: { height: "80%", maxHeight: "80%" },
+    sheetHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 16,
+    },
+    sheetTitle: { fontFamily: 'ui-serif', fontSize: 20, fontWeight: "700", color: colors.navy },
+    sheetDone: { fontSize: 16, fontWeight: "600", color: colors.navy },
+
+    // --- Photo sheet ---
+    fullScreen: { flex: 1, backgroundColor: colors.parchment },
+    fullSheet: { flex: 1, padding: 20 },
+    photoHint: { fontSize: 13, color: colors.inkSoft, marginTop: -6, marginBottom: 12 },
+
+    photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingBottom: 10 },
+    photoCell: {
+        width: "48%",
+        aspectRatio: 0.85,
+        borderRadius: 10,
+        overflow: "hidden",
+        borderWidth: 1,
+        borderColor: colors.gold,
+        backgroundColor: colors.paper,
+    },
+    photoThumb: { width: "100%", height: "100%" },
+    removeBadge: {
+        position: "absolute",
+        top: 6,
+        right: 6,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: "rgba(23,46,75,0.75)",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    addTile: { backgroundColor: "transparent", borderStyle: 'dashed', alignItems: "center", justifyContent: "center", gap: 4 },
+    addTitleText: {
+        color: colors.inkSoft,
+        fontSize: 14,
+    },
+    viewer: { backgroundColor: colors.navy },
+    viewerBar: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingHorizontal: 30,
+        paddingVertical: 12,
+    },
+    viewerCount: { color: colors.parchment, fontSize: 16, fontWeight: "600" },
+
+
+    // --- Category and people sheets ---
+    searchBox: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        backgroundColor: colors.paper,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginBottom: 8,
+    },
+    searchInput: { flex: 1, fontSize: 16, color: colors.navy },
+    sectionHeader: {
+        fontSize: 13,
+        fontWeight: "700",
+        color: colors.inkSoft,
+        textTransform: "uppercase",
+        marginTop: 16,
+        marginBottom: 4,
+    },
+    listRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.paper,
+    },
+    listRowText: {
+        fontFamily: 'ui-serif',
+        fontSize: 16,
+        color: colors.navy,
+    },
+    listRowTextSelected: { fontWeight: "700" },
+    addRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        paddingVertical: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.paper,
+    },
+    addRowText: { fontSize: 16, fontWeight: "600", color: colors.navy },
+    emptyText: { textAlign: "center", color: colors.inkSoft, marginTop: 24 },
 });

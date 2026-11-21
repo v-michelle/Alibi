@@ -1,20 +1,22 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { supabase } from "@/lib/supabase/client";
 import { uploadAlibiPhotos } from "@/lib/supabase/storage";
 import { useCreate } from "@/context/CreateContext";
 import AlibiForm, { AlibiFormValues, FormPhoto } from "@/components/AlibiForm";
+import { BrandActivityIndicator } from "@/components/Branding";
+import {colors} from "@/lib/theme"
 
 const BUCKET = "alibi-photos";
 
 export default function EditAlibi() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { alibis, categories, isLoading, updateAlibi } = useCreate();
+  const { alibis, categories, isLoading, updateAlibi,deleteAlibi } = useCreate();
 
   const post = alibis.find((a) => String(a.id) === id);
   const [photos, setPhotos] = useState<FormPhoto[] | null>(null);
-
+    const [deleting, setDeleting] = useState(false);
   // Load viewable URLs for the photos already saved on this post
   useEffect(() => {
     if (!post) return;
@@ -43,13 +45,13 @@ export default function EditAlibi() {
   if (!post) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 12 }}>
-        {isLoading ? (
-          <ActivityIndicator />
+        {isLoading || deleting ? (
+          <BrandActivityIndicator />
         ) : (
           <>
-            <Text>This alibi couldn't be found.</Text>
+            <Text style={{ fontFamily: "ui-serif", color: colors.navy }}>This alibi couldn't be found.</Text>
             <TouchableOpacity onPress={() => router.back()}>
-              <Text style={{ color: "#2B3FD6", fontWeight: "600" }}>Go back</Text>
+              <Text style={{ color: colors.navy, fontWeight: "600" }}>Go back</Text>
             </TouchableOpacity>
           </>
         )}
@@ -59,8 +61,8 @@ export default function EditAlibi() {
 
   if (!photos) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator />
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.parchment  }}>
+        <BrandActivityIndicator />
       </View>
     );
   }
@@ -89,6 +91,17 @@ export default function EditAlibi() {
 
     router.back();
   };
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await deleteAlibi(post.id);
+      router.back();
+    } catch (error) {
+      setDeleting(false);
+      throw error; // the form shows the error message
+    }
+  };
+
 
   return (
     <AlibiForm
@@ -96,6 +109,7 @@ export default function EditAlibi() {
       submitLabel="Save changes"
       onCancel={() => router.back()}
       onSubmit={handleSave}
+      onDelete={handleDelete}
       initial={{
         title: post.title,
         description: post.description ?? "",

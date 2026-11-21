@@ -1,12 +1,24 @@
-import { View, Text, StyleSheet, Button, TextInput, TouchableOpacity, Alert, ActivityIndicator} from "react-native";
+import {
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { supabase } from "@/lib/supabase/client";
 import { uploadProfileImage } from "@/lib/supabase/storage";
+import { BrandActivityIndicator } from "@/components/Branding";
+import { colors } from "@/lib/theme";
 
 export default function OnBoardingScreen() {
     const [name, setName] = useState("");
@@ -119,158 +131,204 @@ export default function OnBoardingScreen() {
     };
 
   return (
-    <SafeAreaView edges={["top","bottom"]} style={styles.container}>
-    <View style={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Complete your profile</Text>
-        <Text style={styles.subtitle}>Please fill in the following information to complete your profile.</Text>
-      </View>
+    <SafeAreaView edges={["top", "bottom"]} style={styles.screen}>
+      <KeyboardAvoidingView
+        style={styles.keyboard}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <Text style={styles.title}>Complete your profile</Text>
+            <Text style={styles.subtitle}>
+              Add a few details so your friends know it&apos;s you.
+            </Text>
+          </View>
 
-      <View style={styles.form}>
-        <TouchableOpacity style={styles.imageContainer} onPress={showImagePicker}>
-            
-            {profileImage ? (<Image
-                source={{ uri: profileImage }}
-                style={styles.profileImage}
-            />
-            ) :(
-                <View style={styles.placeholderImage}>
-                <Text style={styles.placeholderText}>+</Text>
-            </View>)}
+          <View style={styles.card}>
+            <View style={styles.form}>
+              <TouchableOpacity style={styles.imageContainer} onPress={showImagePicker}>
+                {profileImage ? (
+                  <Image source={{ uri: profileImage }} style={styles.profileImage} />
+                ) : (
+                  <View style={styles.placeholderImage}>
+                    <Text style={styles.placeholderText}>+</Text>
+                  </View>
+                )}
+                <View style={styles.editBadge}>
+                  <Text style={styles.editText}>Edit</Text>
+                </View>
+              </TouchableOpacity>
+              <Text style={styles.photoHint}>Add a profile photo (optional)</Text>
 
-            <View style={styles.editBadge}>
-                <Text style={styles.editText}>edit</Text>
+              <TextInput
+                placeholder="Name"
+                placeholderTextColor={colors.inkSoft}
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+                style={styles.input}
+                selectionColor={colors.navy}
+              />
+              <TextInput
+                placeholder="Username"
+                placeholderTextColor={colors.inkSoft}
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+                autoComplete="username"
+                autoCorrect={false}
+                style={styles.input}
+                selectionColor={colors.navy}
+              />
+              <TouchableOpacity
+                style={[styles.button, isLoading && styles.buttonDisabled]}
+                onPress={handleComplete}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <BrandActivityIndicator size={24} tintColor={colors.parchment} />
+                ) : (
+                  <Text style={styles.buttonText}>Complete Profile</Text>
+                )}
+              </TouchableOpacity>
             </View>
-        </TouchableOpacity> 
-        <TextInput
-          placeholder="Name"
-          placeholderTextColor="#999"
-          value={name}
-          onChangeText={setName}
-          autoCapitalize="words"
-          style={styles.input}
-        />
-        <TextInput
-          placeholder="Username"
-          placeholderTextColor="#999"
-          value={username}
-          onChangeText={setUsername}
-          autoCapitalize="none"
-          autoComplete="username"
-          style={styles.input}
-        />
-        <TouchableOpacity style={styles.button} onPress={handleComplete}>
-            {isLoading? (
-            <ActivityIndicator size={24} color="#fff"/>
-            ) : (
-            <Text style={styles.buttonText}>Complete Profile</Text>
-            )}
-        </TouchableOpacity>
-      </View>
-    </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: "#fefefe",
+    backgroundColor: colors.parchment,
   },
-  content: {
+  keyboard: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: "center",
-    padding: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 28,
   },
   header: {
+    width: "100%",
+    maxWidth: 460,
+    alignSelf: "center",
     marginBottom: 20,
     alignItems: "center",
   },
   title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
+    color: colors.navy,
+    fontFamily: "ui-serif",
+    fontSize: 28,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 8,
   },
-    subtitle: {
+  subtitle: {
     fontSize: 16,
-    color: "#666",
-    marginBottom: 20,
+    lineHeight: 23,
+    color: colors.inkSoft,
+    textAlign: "center",
+  },
+  card: {
+    width: "100%",
+    maxWidth: 460,
+    alignSelf: "center",
+    backgroundColor: colors.card,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.paper,
+    padding: 24,
   },
   form: {
-    width: "100%",
     alignItems: "center",
-    justifyContent: "center",
-  },  
+  },
+  photoHint: {
+    color: colors.inkSoft,
+    fontSize: 14,
+    marginTop: -20,
+    marginBottom: 24,
+  },
   input: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 5,
-    padding: 10,
-    fontSize: 16,
-    marginBottom: 10,
     width: "100%",
+    backgroundColor: colors.parchment,
+    borderWidth: 1,
+    borderColor: colors.paper,
+    borderRadius: 12,
+    color: colors.navy,
+    fontSize: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 12,
   },
   button: {
-    backgroundColor: "#000000",
-    borderRadius: 12,
-    padding: 10,
-    alignItems: "center",
     width: "100%",
+    minHeight: 50,
+    backgroundColor: colors.navy,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+  },
+  buttonDisabled: {
+    opacity: 0.8,
   },
   buttonText: {
-    color: "#fff",
+    color: colors.parchment,
     fontSize: 16,
-    fontWeight: "bold",
-  },
-  linkButton: {
-    marginTop: 10,
-    alignItems: "center",
-  },   
-  linkText:{
-    color: "#0b27b7",
+    fontWeight: "700",
   },
   imageContainer:{
-    marginBottom: 32,
+    marginBottom: 24,
     position: "relative",
   }, 
   profileImage:{
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: "#ccc",
+    backgroundColor: colors.paper,
   },
   placeholderImage: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: "#ccc",
+    backgroundColor: colors.parchment,
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
-    borderWidth: 2,
-    borderColor: "#fff",
+    borderWidth: 1,
+    borderColor: colors.gold,
     borderStyle: "dashed",
   },
   placeholderText: {
     fontSize: 48,
-    color: "#999",
+    color: colors.inkSoft,
   },
   editBadge: {
     position: "absolute",
     bottom: 0,
     right: 0,
-    backgroundColor: "#000000",
+    backgroundColor: colors.navy,
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   editBadgeText: {
-    color: "#fff",
+    color: colors.parchment,
     fontSize: 12,
   },
   editText: {
-    color: "#fff",
+    color: colors.parchment,
     fontSize: 12,
+    fontWeight: "600",
   },
 });
