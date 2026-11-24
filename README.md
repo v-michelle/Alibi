@@ -1,8 +1,60 @@
-# Welcome to your Expo app 👋
+# Alibi
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Alibi is a online journal for keeping track of what you did, when, and who you were with. Each entry (an "alibi") has a title, date and time, optional description, photos, a category, and the people who were there. You can filter it, and edit or delete entries.
 
-## Get started
+Built with Expo (React Native) and Supabase. Runs on iOS only.
+
+## Features
+
+- **Accounts:** email and password sign-up and login, with an onboarding step for name, username and profile photo
+- **Alibis:** create, edit and delete entries with multiple photos from the camera or photo library
+- **Categories:** built-in categories, plus your own custom ones
+- **People:** tag the people you were with; one alibi can have many people
+- **Home feed:** swipeable photo carousel on each entry
+- **Filters:** by date range (date of event or date posted), category and person
+- **Profile:** change your profile photo, manage categories and people, or log out
+
+## Tech stack
+
+| Area | Choice |
+| --- | --- |
+| App | Expo SDK 58, React Native, TypeScript |
+| Navigation | Expo Router (file-based routing) |
+| State | React Context (`AuthContext`, `CreateContext`) |
+| Database | Supabase Postgres with row-level security |
+| Auth | Supabase Auth (email and password) |
+| File storage | Supabase Storage (private bucket, signed URLs) |
+
+## Project structure
+
+```
+src/
+  app/
+    (auth)/          login, signup, onboarding screens
+    (tabs)/          home feed, add alibi, profile
+    edit/[id].tsx    edit an existing alibi
+  components/        AlibiForm, branding
+  context/
+    AuthContext.tsx  signed-in user, sign in/up/out, delete account
+    CreateContext.tsx alibis, categories, and people 
+  lib/
+    supabase/        Supabase client and storage helpers
+    theme.ts         colours
+```
+
+## Database
+
+| Table | Purpose |
+| --- | --- |
+| `profiles` | One row per user: name, username, profile photo, onboarding status |
+| `alibi_posts` | The entries: title, description, date, photo paths, category |
+| `categories` | Built-in categories (`user_id` is null) and each user's custom ones |
+| `people` | People a user can tag (only by name)|
+| `alibi_people` | Join table linking alibis and people (many-to-many) |
+
+Photos live in the private `alibi-photos` storage bucket. The database stores only file paths, and the app requests signed URLs that expire after one hour.
+
+## Running it locally
 
 1. Install dependencies
 
@@ -10,47 +62,20 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npm install
    ```
 
-2. Start the app
+2. Create a `.env` file in the project root with your Supabase project's details (found in the Supabase dashboard under **Project Settings → API**):
+
+   ```
+   EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   ```
+
+3. Start the app
 
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+### Supabase setup
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+1. Create the tables above and turn on row-level security for each one, so users can only read and change their own rows.
+2. Create a private storage bucket called `alibi-photos`.
