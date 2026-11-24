@@ -118,7 +118,7 @@ function PostCard({ post }: { post: Alibi }) {
       <View style={styles.cardBody}>
 
         <Text style={[styles.cardTitle, paths.length === 0 && { paddingRight: 40 }]}>{post.title}</Text>
-        {/* edit feature  */}
+        
         <View style={styles.metaRow}>
           <Ionicons name="calendar-outline" size={16} color={colors.inkSoft} />
           <Text style={styles.metaText}>
@@ -535,7 +535,7 @@ const styles = StyleSheet.create({
   },
   photoCount: {
     position: "absolute",
-    bottom: 10,   // was top: 10
+    bottom: 10,  
     right: 10,
     backgroundColor: "rgba(0,0,0,0.6)",
     borderRadius: 12,

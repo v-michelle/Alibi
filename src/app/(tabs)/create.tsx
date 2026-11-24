@@ -9,6 +9,7 @@ export default function Create() {
   const [formKey, setFormKey] = useState(0);
 
  return (
+  //from alibiForm
     <AlibiForm
       key={formKey}
       heading="New alibi"
@@ -24,7 +25,7 @@ export default function Create() {
           category_id: v.category?.id ?? null,
           person_ids: v.people.map((p) => p.id),
         });
-        setFormKey((k) => k + 1); // clears the form for next time
+        setFormKey((k) => k + 1); // resets the form for next post.
         router.back();
       }}
     />
