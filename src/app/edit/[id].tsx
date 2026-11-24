@@ -9,38 +9,62 @@ import { BrandActivityIndicator } from "@/components/Branding";
 import {colors} from "@/lib/theme"
 
 const BUCKET = "alibi-photos";
+const EMPTY_IMAGE_PATHS: string[] = [];
 
 export default function EditAlibi() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { alibis, categories, isLoading, updateAlibi,deleteAlibi } = useCreate();
 
   const post = alibis.find((a) => String(a.id) === id);
-  const [photos, setPhotos] = useState<FormPhoto[] | null>(null);
-    const [deleting, setDeleting] = useState(false);
-  // Load viewable URLs for the photos already saved on this post
+  const postId = post?.id;
+  const paths = post?.image_paths ?? EMPTY_IMAGE_PATHS;
+  const [loadedPhotos, setLoadedPhotos] = useState<{
+    postId: string;
+    paths: string[];
+    photos: FormPhoto[];
+  } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  // urls for photos already saved on this post
   useEffect(() => {
-    if (!post) return;
-    const paths = post.image_paths ?? [];
-    if (paths.length === 0) {
-      setPhotos([]);
-      return;
-    }
+    if (!postId || paths.length === 0) return;
+    let cancelled = false;
+
     supabase.storage
       .from(BUCKET)
       .createSignedUrls(paths, 3600)
       .then(({ data, error }) => {
+        if (cancelled) return;
         if (error) console.warn("Loading alibi photos failed:", error.message);
         // keep every path even if a URL failed, so saving never drops a photo by accident
-        setPhotos(paths.map((path, i) => ({
-          path,
-          uri: data?.[i]?.signedUrl ?? data?.[i]?.signedURL ?? "",
-        })));
+        setLoadedPhotos({
+          postId,
+          paths,
+          photos: paths.map((path, i) => ({
+            path,
+            uri: data?.[i]?.signedUrl ?? data?.[i]?.signedURL ?? "",
+          })),
+        });
       })
       .catch((error: unknown) => {
+        if (cancelled) return;
         console.error("Loading alibi photos failed:", error);
-        setPhotos(paths.map((path) => ({ path, uri: "" })));
+        setLoadedPhotos({
+          postId,
+          paths,
+          photos: paths.map((path) => ({ path, uri: "" })),
+        });
       });
-  }, [post?.id]);
+    return () => {
+      cancelled = true;
+    };
+  }, [postId, paths]);
+
+  const photos =
+    paths.length === 0
+      ? []
+      : loadedPhotos && loadedPhotos.postId === postId && loadedPhotos.paths === paths
+        ? loadedPhotos.photos
+        : null;
 
   if (!post) {
     return (
@@ -49,7 +73,7 @@ export default function EditAlibi() {
           <BrandActivityIndicator />
         ) : (
           <>
-            <Text style={{ fontFamily: "ui-serif", color: colors.navy }}>This alibi couldn't be found.</Text>
+            <Text style={{ fontFamily: "ui-serif", color: colors.navy }}>This alibi couldn&apos;t be found.</Text>
             <TouchableOpacity onPress={() => router.back()}>
               <Text style={{ color: colors.navy, fontWeight: "600" }}>Go back</Text>
             </TouchableOpacity>
@@ -68,7 +92,7 @@ export default function EditAlibi() {
   }
 
   const handleSave = async (v: AlibiFormValues) => {
-    // upload only the newly added photos, keeping the original order
+  
     const newOnes = v.photos.filter((p) => !p.path);
     const uploaded = newOnes.length > 0 ? await uploadAlibiPhotos(newOnes) : [];
     let next = 0;
@@ -83,7 +107,6 @@ export default function EditAlibi() {
       person_ids: v.people.map((p) => p.id),
     });
 
-    // clean up photos the user removed (after the update succeeded)
     const removed = (post.image_paths ?? []).filter((p) => !image_paths.includes(p));
     if (removed.length > 0) {
       await supabase.storage.from(BUCKET).remove(removed);
@@ -98,7 +121,7 @@ export default function EditAlibi() {
       router.back();
     } catch (error) {
       setDeleting(false);
-      throw error; // the form shows the error message
+      throw error; 
     }
   };
 

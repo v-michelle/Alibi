@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import {colors} from "@/lib/theme";
 
 const getTabIcon =
-  (iconName: "home-outline" | "calendar-outline" | "person-circle-outline" | "add-circle-outline") =>
+  (iconName: "home-outline" | "person-circle-outline" | "add-circle-outline") =>
     function TabIcon({ focused, size }: { focused: boolean; size: number }) {
       return (
         <Ionicons

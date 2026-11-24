@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
-import { createContext, useState, ReactNode, useContext,useEffect } from "react";
+import { createContext, useState, ReactNode, useContext, useEffect } from "react";
 
 export interface User{
     id: string;
@@ -17,75 +17,11 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<void>;
   updateUser: (userData: Partial<User>) => Promise<void>;
   signOut: () => Promise<void>;
-  deleteAccount:()=> Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-    const [user, setUser] = useState<User | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        checkSession();
-    }, []);
-
-    const signOut = async () => {
-        await supabase.auth.signOut();
-        setUser(null);
-    };
-    const deleteAccount = async () => {
-        const {
-            data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session?.user) {
-            throw new Error("No signed-in user");
-        }
-
-        const response = await fetch(
-            `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/delete-user`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${session.access_token}`,
-                },
-                body: JSON.stringify({ userId: session.user.id }),
-            }
-        );
-
-        const result = await response.json();
-
-        if (!response.ok) {
-            throw new Error(result?.error || "Failed to delete account");
-        }
-
-        await supabase.auth.signOut();
-        setUser(null);
-    };
-
-    const checkSession = async () => {
-        setIsLoading(true);
-        try{
-            const{
-                data: {session},
-            } = await supabase.auth.getSession();
-            if(session?.user){
-                const profile = await fetchUserProfile(session.user.id);
-                setUser(profile);
-            }else{
-                setUser(null);
-            }
-        }catch(error){
-            console.error("Error checking session:", error);
-            setUser(null);
-        }finally{
-            setIsLoading(false);
-        }
-    };
-
-    const fetchUserProfile = async (userId: string): Promise<User | null> => {
+const fetchUserProfile = async (userId: string): Promise<User | null> => {
     try {
       const { data, error } = await supabase
         .from("profiles")
@@ -126,16 +62,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         username: profileData.username ?? "",
         email: authUser.data.user.email || "",
         profileImage: profileData.profile_image_url,
-        onboardingCompleted: data.onboarding_completed,
+        onboardingCompleted: onboardingStatus,
       };
     } catch (error) {
       console.error("Error in fetchUserProfile:", error);
       return null;
     }
   };
-    
-  
 
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+    const [user, setUser] = useState<User | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        void supabase.auth
+            .getSession()
+            .then(async ({ data: { session } }) => {
+                if (session?.user) {
+                    const profile = await fetchUserProfile(session.user.id);
+                    if (!cancelled) setUser(profile);
+                } else if (!cancelled) {
+                    setUser(null);
+                }
+            })
+            .catch((error: unknown) => {
+                console.error("Error checking session:", error);
+                if (!cancelled) setUser(null);
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const signOut = async () => {
+        await supabase.auth.signOut();
+        setUser(null);
+    };
+    
 
     const signIn = async (email: string, password: string) => {
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -213,7 +181,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     
     return (
-    <AuthContext.Provider value={{ user, signUp, updateUser, isLoading, signIn, signOut, deleteAccount }}>
+    <AuthContext.Provider value={{ user, signUp, updateUser, isLoading, signIn, signOut }}>
         {children}
      </AuthContext.Provider>
     );

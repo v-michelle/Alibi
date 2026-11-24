@@ -41,14 +41,13 @@ export default function OnBoardingScreen() {
             quality: 0.8,
         });
         if (!result.canceled && result.assets[0]) {
-            // Handle the selected image here
             setProfileImage(result.assets[0].uri);
         }
     }; 
     const takePhoto = async () => {
         const {status} = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== "granted") {
-            Alert.alert("Permission denied", "You need to grant permission to access the camera.");
+            Alert.alert("Permission denied", "You need to grant permission to access the camera to upload pictures from the camera.");
             return;
         }
         const result = await ImagePicker.launchCameraAsync({
@@ -57,7 +56,6 @@ export default function OnBoardingScreen() {
             quality: 0.8,
         });
         if (!result.canceled && result.assets[0]) {
-            // Handle the captured photo here
             setProfileImage(result.assets[0].uri);
         }
     };
@@ -106,8 +104,7 @@ export default function OnBoardingScreen() {
             let profileImageUrl: string | undefined;
             if(profileImage){
                 try{
-                    await uploadProfileImage(user.id, profileImage);
-                    profileImageUrl = profileImage;
+                    profileImageUrl = await uploadProfileImage(user.id, profileImage);
                 }catch(error){
                     console.error("Error uploading profile image:", error);
                     Alert.alert("Error uploading profile image.");
@@ -321,10 +318,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 6,
-  },
-  editBadgeText: {
-    color: colors.parchment,
-    fontSize: 12,
   },
   editText: {
     color: colors.parchment,

@@ -111,7 +111,7 @@ export const CreateProvider = ({ children }: { children: ReactNode }) => {
       if (peopleError) throw peopleError;
     }
 
-    await refresh(); // so the home page shows the new post
+    await refresh(); 
   };
 
   const updateAlibi = async (id: string, {person_ids = [], ...changes}: NewAlibi) => {
@@ -129,7 +129,7 @@ export const CreateProvider = ({ children }: { children: ReactNode }) => {
     }
     if(toAdd.length>0){
       const {error:addError}= await supabase
-        .from("alibi_people").insert(toAdd.map((person_ids)=> ({alibi_id:id,person_ids})));
+        .from("alibi_people").insert(toAdd.map((person_id)=> ({alibi_id:id,person_id})));
       if(addError) throw addError;
     }
     await refresh();
@@ -137,12 +137,10 @@ export const CreateProvider = ({ children }: { children: ReactNode }) => {
 
 const deleteAlibi = async (id: string) => {
   const paths = alibis.find((a) => a.id === id)?.image_paths ?? [];
-
-  // the alibi_people rows delete themselves (on delete cascade)
   const { error } = await supabase.from("alibi_posts").delete().eq("id", id);
   if (error) throw error;
 
-  // remove the photos from storage too
+  // removes the photos from storage
   if (paths.length > 0) {
     const { error: storageError } = await supabase.storage.from("alibi-photos").remove(paths);
     if (storageError) console.warn("Deleting photos failed:", storageError.message);

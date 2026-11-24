@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import {
     Text,
     View,
@@ -20,7 +20,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { Category, Person, useCreate } from "@/context/CreateContext";
 import { colors } from "@/lib/theme";
-import { BrandLogo } from "./Branding";
+import type { ScrollViewInstance } from "react-native";
 export type FormPhoto = { uri: string; path?: string };
 
 export type AlibiFormValues = {
@@ -54,14 +54,15 @@ function usePhotoPicker(initial: FormPhoto[]) {
         }
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ["images"],
-            allowsMultipleSelection: true,
+
             selectionLimit: MAX_PHOTOS - photos.length,
-            aspect: [1, 1],
+            allowsEditing: true,
+            aspect: [4, 3],
             quality: 0.8,
         });
         if (!result.canceled && result.assets[0]) {
-            const picked = result.assets.map((a) => ({ uri: a.uri }));
-            setPhotos((prev) => [...prev, ...picked].slice(0, MAX_PHOTOS));
+            const a = result.assets[0];
+            setPhotos((prev) => [...prev, { uri: a.uri }].slice(0, MAX_PHOTOS));
         }
     };
     const takePhoto = async () => {
@@ -72,7 +73,7 @@ function usePhotoPicker(initial: FormPhoto[]) {
         }
         const result = await ImagePicker.launchCameraAsync({
             allowsEditing: true,
-            aspect: [1, 1],
+            aspect: [4, 3],
             quality: 0.8,
         });
         if (!result.canceled && result.assets[0]) {
@@ -83,7 +84,6 @@ function usePhotoPicker(initial: FormPhoto[]) {
     const showImagePicker = () => {
         if (photos.length >= MAX_PHOTOS) {
             Alert.alert("Limit reached", `You can add up to ${MAX_PHOTOS} photos.`, [
-                { text: "Edit Photos", onPress: () => { close } },
                 { text: "Cancel", style: "cancel" },
             ]);
             return;
@@ -169,9 +169,10 @@ function PhotoSheet({
     onRemove: (index: number) => void;
     onAddMore: () => void;
 }) {
-    const [viewerIndex, setViewerIndex] = useState<number | null>(null); // null = viewer closed
+    const [viewerIndex, setViewerIndex] = useState<number | null>(null);
     const [page, setPage] = useState(0); // photo currently showing in the viewer
     const [pager, setPager] = useState({ width: 0, height: 0 });
+
 
     const openViewer = (index: number) => {
         setPage(index);
@@ -210,103 +211,103 @@ function PhotoSheet({
             onRequestClose={viewerIndex !== null ? closeViewer : close}
         >
             <SafeAreaProvider style={styles.fullScreen}>
-              <View style={styles.fullScreen}>
-                <SafeAreaView edges={["top", "bottom"]} style={styles.fullSheet}>
-                    <View style={styles.sheetHeader}>
-                        <Text style={styles.sheetTitle}>Your photos</Text>
-                        <TouchableOpacity onPress={close}>
-                            <Text style={styles.sheetDone}>Done</Text>
-                        </TouchableOpacity>
-                    </View>
-                    {photos.length > 0 && <Text style={styles.photoHint}>Tap a photo to view it larger</Text>}
-                    <ScrollView contentContainerStyle={styles.photoGrid} showsVerticalScrollIndicator={false}>
-                        {photos.map((photo, index) => (
-                            <TouchableOpacity
-                                key={photo.path ?? photo.uri}
-                                style={styles.photoCell}
-                                activeOpacity={0.85}
-                                onPress={() => openViewer(index)}
-                            >
-                                <Image
-                                    source={{ uri: photo.uri }}
-                                    style={styles.photoThumb}
-                                    contentFit="cover"
-                                />
+                <View style={styles.fullScreen}>
+                    <SafeAreaView edges={["top", "bottom"]} style={styles.fullSheet}>
+                        <View style={styles.sheetHeader}>
+                            <Text style={styles.sheetTitle}>Your photos</Text>
+                            <TouchableOpacity onPress={close}>
+                                <Text style={styles.sheetDone}>Done</Text>
+                            </TouchableOpacity>
+                        </View>
+                        {photos.length > 0 && <Text style={styles.photoHint}>Tap a photo to view it larger, add up to 5 photos.</Text>}
+                        <ScrollView contentContainerStyle={styles.photoGrid} showsVerticalScrollIndicator={false}>
+                            {photos.map((photo, index) => (
                                 <TouchableOpacity
-                                    style={styles.removeBadge}
-                                    onPress={() => confirmRemove(index)}
+                                    key={photo.path ?? photo.uri}
+                                    style={styles.photoCell}
+                                    activeOpacity={0.85}
+                                    onPress={() => openViewer(index)}
                                 >
-                                    <Ionicons name="close" size={16} color="#fff" />
-                                </TouchableOpacity>
-                            </TouchableOpacity>
-                        ))}
-                        {photos.length < MAX_PHOTOS && (
-                            <TouchableOpacity style={[styles.photoCell, styles.addTile]} onPress={onAddMore}>
-                                <Ionicons name="add" size={32} color={colors.inkSoft} />
-                                <Text style={styles.addTitleText}>Add photos</Text>
-                            </TouchableOpacity>
-                        )}
-                    </ScrollView>
-                </SafeAreaView>
-                {viewerIndex !== null && (
-                    <View style={[StyleSheet.absoluteFill, styles.viewer]}>
-                        <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1 }}>
-                            <View style={styles.viewerBar}>
-                                <TouchableOpacity onPress={closeViewer} hitSlop={12} accessibilityLabel="Close photo">
-                                    <Ionicons name="chevron-back" size={28} color={colors.parchment} />
-                                </TouchableOpacity>
-                                <Text style={styles.viewerCount}>
-                                    {page + 1} / {photos.length}
-                                </Text>
-                                <TouchableOpacity onPress={() => confirmRemove(page, closeViewer)} hitSlop={12} accessibilityLabel="Delete photo">
-                                    <Ionicons name="trash-outline" size={24} color={colors.parchment} />
-                                </TouchableOpacity>
-                            </View>
-
-                            <View
-                                style={{ flex: 1 }}
-                                onLayout={(e) =>
-                                    setPager({
-                                        width: e.nativeEvent.layout.width,
-                                        height: e.nativeEvent.layout.height,
-                                    })
-                                }
-                            >
-                                {pager.width > 0 && (
-                                    <ScrollView
-                                        horizontal
-                                        pagingEnabled
-                                        showsHorizontalScrollIndicator={false}
-                                        contentOffset={{ x: viewerIndex * pager.width, y: 0 }}
-                                        onMomentumScrollEnd={(e) =>
-                                            setPage(Math.round(e.nativeEvent.contentOffset.x / pager.width))
-                                        }
+                                    <Image
+                                        source={{ uri: photo.uri }}
+                                        style={styles.photoThumb}
+                                        contentFit="cover"
+                                    />
+                                    <TouchableOpacity
+                                        style={styles.removeBadge}
+                                        onPress={() => confirmRemove(index)}
                                     >
-                                        {photos.map((p) => (
-                                            <ScrollView
-                                                key={p.path ?? p.uri}
-                                                style={{ width: pager.width, height: pager.height }}
-                                                contentContainerStyle={{ width: pager.width, height: pager.height }}
-                                                maximumZoomScale={3}
-                                                minimumZoomScale={1}
-                                                centerContent
-                                                showsHorizontalScrollIndicator={false}
-                                                showsVerticalScrollIndicator={false}
-                                            >
-                                                <Image
-                                                    source={{ uri: p.uri }}
+                                        <Ionicons name="close" size={16} color="#fff" />
+                                    </TouchableOpacity>
+                                </TouchableOpacity>
+                            ))}
+                            {photos.length < MAX_PHOTOS && (
+                                <TouchableOpacity style={[styles.photoCell, styles.addTile]} onPress={onAddMore}>
+                                    <Ionicons name="add" size={32} color={colors.inkSoft} />
+                                    <Text style={styles.addTitleText}>Add photos</Text>
+                                </TouchableOpacity>
+                            )}
+                        </ScrollView>
+                    </SafeAreaView>
+                    {viewerIndex !== null && (
+                        <View style={[StyleSheet.absoluteFill, styles.viewer]}>
+                            <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1 }}>
+                                <View style={styles.viewerBar}>
+                                    <TouchableOpacity onPress={closeViewer} hitSlop={12} accessibilityLabel="Close photo">
+                                        <Ionicons name="chevron-back" size={28} color={colors.parchment} />
+                                    </TouchableOpacity>
+                                    <Text style={styles.viewerCount}>
+                                        {page + 1} / {photos.length}
+                                    </Text>
+                                    <TouchableOpacity onPress={() => confirmRemove(page, closeViewer)} hitSlop={12} accessibilityLabel="Delete photo">
+                                        <Ionicons name="trash-outline" size={24} color={colors.parchment} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <View
+                                    style={{ flex: 1 }}
+                                    onLayout={(e) =>
+                                        setPager({
+                                            width: e.nativeEvent.layout.width,
+                                            height: e.nativeEvent.layout.height,
+                                        })
+                                    }
+                                >
+                                    {pager.width > 0 && (
+                                        <ScrollView
+                                            horizontal
+                                            pagingEnabled
+                                            showsHorizontalScrollIndicator={false}
+                                            contentOffset={{ x: viewerIndex * pager.width, y: 0 }}
+                                            onMomentumScrollEnd={(e) =>
+                                                setPage(Math.round(e.nativeEvent.contentOffset.x / pager.width))
+                                            }
+                                        >
+                                            {photos.map((p) => (
+                                                <ScrollView
+                                                    key={p.path ?? p.uri}
                                                     style={{ width: pager.width, height: pager.height }}
-                                                    contentFit="contain"
-                                                />
-                                            </ScrollView>
-                                        ))}
-                                    </ScrollView>
-                                )}
-                            </View>
-                        </SafeAreaView>
-                    </View>
-                )}
-              </View>
+                                                    contentContainerStyle={{ width: pager.width, height: pager.height }}
+                                                    maximumZoomScale={3}
+                                                    minimumZoomScale={1}
+                                                    centerContent
+                                                    showsHorizontalScrollIndicator={false}
+                                                    showsVerticalScrollIndicator={false}
+                                                >
+                                                    <Image
+                                                        source={{ uri: p.uri }}
+                                                        style={{ width: pager.width, height: pager.height }}
+                                                        contentFit="contain"
+                                                    />
+                                                </ScrollView>
+                                            ))}
+                                        </ScrollView>
+                                    )}
+                                </View>
+                            </SafeAreaView>
+                        </View>
+                    )}
+                </View>
             </SafeAreaProvider>
         </Modal>
     );
@@ -579,7 +580,7 @@ function PeopleSheet({
                                                 : "ellipse-outline"
                                         }
                                         size={22}
-                                        color={selected ? colors.navy : colors.gold}
+                                        color={isSelected ? colors.navy : colors.gold}
                                     />
                                 </TouchableOpacity>
                             );
@@ -600,7 +601,7 @@ export default function AlibiForm({
     onCancel,
     onDelete
 }: AlibiFormProps) {
-    // Form values (initial values are only read on the first render)
+    //Form values (
     const [title, setTitle] = useState(initial?.title ?? "");
     const [description, setDescription] = useState(initial?.description ?? "");
     const [date, setDate] = useState(initial?.date ?? new Date());
@@ -609,10 +610,22 @@ export default function AlibiForm({
     const { photos, showImagePicker, removePhoto } = usePhotoPicker(initial?.photos ?? []);
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
-    // Which modal is open
+    //modals
     const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
     const [peopleSheetOpen, setPeopleSheetOpen] = useState(false);
     const [categorySheetOpen, setCategorySheetOpen] = useState(false);
+    //formatting page so description isnt blocked by the keyboard.
+    const scrollRef = useRef<ScrollViewInstance|null>(null);
+    const containerY = useRef(0);
+    const descY = useRef(0);
+    const scrollToDescription = () => {
+        setTimeout(() => {
+            scrollRef.current?.scrollTo({
+                y: containerY.current + descY.current - 24,
+                animated: true,
+            });
+        }, 300);
+    };
 
     const onPhotoRowPress = () => {
         if (photos.length === 0) showImagePicker();
@@ -680,77 +693,85 @@ export default function AlibiForm({
     return (
         <>
             <SafeAreaView edges={["top", "bottom"]} style={styles.screen}>
-                <KeyboardAvoidingView style={{ flex: 1 }} 
-                behavior={Platform.OS === "ios" ? "padding" : undefined}>
-                    <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                <ScrollView
+                    ref={scrollRef}
+                    automaticallyAdjustKeyboardInsets
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="interactive"
+                    contentContainerStyle={{ paddingBottom: 40 }}
+                    showsVerticalScrollIndicator={false}>
 
-                        <View style={styles.header}>
-                            <View >
-                                <Text style={styles.title}>{heading}</Text>
-                                {subheading ? <Text style={styles.subtitle}>{subheading}</Text> : null}
-                            </View>
-                            {onCancel && (
-                                <TouchableOpacity onPress={onCancel} hitSlop={10}>
-                                    <Text style={styles.cancelText}>Cancel</Text>
-                                </TouchableOpacity>
-                            )}
+                    <View style={styles.header}>
+                        <View >
+                            <Text style={styles.title}>{heading}</Text>
+                            {subheading ? <Text style={styles.subtitle}>{subheading}</Text> : null}
                         </View>
-                        <View style={styles.container}>
-                            <TextInput
-                                placeholder="Enter title"
-                                placeholderTextColor={colors.inkSoft}
-                                value={title}
-                                onChangeText={setTitle}
-                                style={styles.inputText}
-                            />
-
-                            <DateField date={date} onChange={setDate} />
-
-                            <FormRow
-                                icon="camera-outline"
-                                label={photos.length > 0 ? "Edit photos" : "Upload photo"}
-                                value={photosSummary}
-                                onPress={onPhotoRowPress}
-                            />
-                    
-
-                            <FormRow
-                                icon="people-outline"
-                                label="Who was there?"
-                                value={peopleSummary}
-                                onPress={() => setPeopleSheetOpen(true)}
-                            />
-
-                            <FormRow
-                                icon="pricetag-outline"
-                                label="Category"
-                                value={category?.name}
-                                onPress={() => setCategorySheetOpen(true)}
-                            />
-                            <View style={[styles.input, { alignItems: "flex-start" }]}>
-                                <Ionicons name="create-outline" style={styles.icon} />
-                                <TextInput
-                                    placeholder="Add description"
-                                    placeholderTextColor={colors.inkSoft}
-                                    value={description}
-                                    onChangeText={setDescription}
-                                    multiline
-                                    style={styles.descInput}
-                                />
-                            </View>
-
-                            <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={saving || deleting}>
-                                <Text style={styles.buttonText}>{saving ? "Saving..." : submitLabel}</Text>
+                        {onCancel && (
+                            <TouchableOpacity onPress={onCancel} hitSlop={10}>
+                                <Text style={styles.cancelText}>Cancel</Text>
                             </TouchableOpacity>
-                            {onDelete && (
-                                <TouchableOpacity style={styles.deleteButton} onPress={confirmDelete} disabled={saving || deleting}>
-                                    <Ionicons name="trash-outline" size={18} color={colors.danger} />
-                                    <Text style={styles.deleteText}>{deleting ? "Deleting..." : "Delete alibi"}</Text>
-                                </TouchableOpacity>
-                            )}
+                        )}
+                    </View>
+                    <View style={styles.container}
+                    onLayout={(e)=> {containerY.current=e.nativeEvent.layout.y;}}>
+                        <TextInput
+                            placeholder="Enter title"
+                            placeholderTextColor={colors.inkSoft}
+                            value={title}
+                            onChangeText={setTitle}
+                            style={styles.inputText}
+                        />
+
+                        <DateField date={date} onChange={setDate} />
+
+                        <FormRow
+                            icon="camera-outline"
+                            label={photos.length > 0 ? "Edit photos" : "Upload photo"}
+                            value={photosSummary}
+                            onPress={onPhotoRowPress}
+                        />
+
+
+                        <FormRow
+                            icon="people-outline"
+                            label="Who was there?"
+                            value={peopleSummary}
+                            onPress={() => setPeopleSheetOpen(true)}
+                        />
+
+                        <FormRow
+                            icon="pricetag-outline"
+                            label="Category"
+                            value={category?.name}
+                            onPress={() => setCategorySheetOpen(true)}
+                        />
+
+                        <View style={[styles.input, { alignItems: "flex-start" }]}
+                            onLayout={(e)=> {descY.current = e.nativeEvent.layout.y;}}>
+                            <Ionicons name="create-outline" style={styles.icon} />
+                            <TextInput
+                                placeholder="Add description"
+                                placeholderTextColor={colors.inkSoft}
+                                value={description}
+                                onChangeText={setDescription}
+                                onFocus={scrollToDescription}
+                                multiline
+                                style={styles.descInput}
+                            />
                         </View>
-                    </ScrollView>
-                </KeyboardAvoidingView>
+
+                        <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={saving || deleting}>
+                            <Text style={styles.buttonText}>{saving ? "Saving..." : submitLabel}</Text>
+                        </TouchableOpacity>
+                        {onDelete && (
+                            <TouchableOpacity style={styles.deleteButton} onPress={confirmDelete} disabled={saving || deleting}>
+                                <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                                <Text style={styles.deleteText}>{deleting ? "Deleting..." : "Delete alibi"}</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                </ScrollView>
+
             </SafeAreaView>
             <PhotoSheet
                 visible={photoSheetOpen}
@@ -787,26 +808,26 @@ const styles = StyleSheet.create({
     },
     header: {
         flexDirection: "row",
-        justifyContent:'space-between',
+        justifyContent: 'space-between',
         alignItems: "flex-start",
-        marginBottom:20
+        marginBottom: 20
     },
     brandHeader: {
-        gap:10,
-        marginBottom:18,
+        gap: 10,
+        marginBottom: 18,
     },
     title: {
         fontFamily: 'ui-serif',
-    fontSize: 32,
-    fontWeight: "bold",
-    color: colors.navy,
-    marginBottom: 6,
+        fontSize: 32,
+        fontWeight: "bold",
+        color: colors.navy,
+        marginBottom: 6,
     },
     subtitle: {
         fontFamily: 'ui-serif',
-    fontSize: 16,
-    color: colors.inkSoft,
-    
+        fontSize: 16,
+        color: colors.inkSoft,
+
     },
     cancelText: {
         fontSize: 16,
@@ -817,7 +838,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         backgroundColor: colors.card,
         padding: 20,
-        
+
         borderWidth: 1,
         borderColor: colors.paper,
     },
@@ -863,7 +884,8 @@ const styles = StyleSheet.create({
     descInput: {
         flex: 1,
         marginLeft: 8,
-        minHeight: 60,
+        minHeight: 80,
+        maxHeight:160,
         fontFamily: "ui-serif",
         fontSize: 16,
         color: colors.navy,
@@ -915,7 +937,7 @@ const styles = StyleSheet.create({
     // --- Photo sheet ---
     fullScreen: { flex: 1, backgroundColor: colors.parchment },
     fullSheet: { flex: 1, padding: 20 },
-    photoHint: { fontSize: 13, color: colors.inkSoft, marginTop: -6, marginBottom: 12 },
+    photoHint: { fontSize: 13, color: colors.inkSoft, marginTop: -6, marginBottom: 20 },
 
     photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingBottom: 10 },
     photoCell: {
@@ -939,7 +961,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
     },
-    addTile: { backgroundColor: "transparent", borderStyle: 'dashed', alignItems: "center", justifyContent: "center", gap: 4 },
+    addTile: { backgroundColor: "transparent", borderStyle: 'dashed', alignItems: "center",alignSelf:'flex-start', justifyContent: "center", gap: 4 },
     addTitleText: {
         color: colors.inkSoft,
         fontSize: 14,

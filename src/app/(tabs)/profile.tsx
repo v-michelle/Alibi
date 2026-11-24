@@ -1,6 +1,5 @@
 import {
   Alert,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -15,6 +14,7 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { uploadProfileImage } from "@/lib/supabase/storage";
 import { useAuth } from "@/context/AuthContext";
 import { useState } from "react";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
@@ -87,24 +87,7 @@ export default function Profile() {
     ]);
   };
 
-  const handleDelete = async () => {
-    Alert.alert(
-      "Are you sure you want to delete your account?",
-      "Your account cannot be recovered once deleted",
-      [
-        { text: "Cancel" },
-        {
-          text: "Permanently Delete Account",
-          style: "destructive",
-          onPress: async () => {
-            await signOut();
-            router.replace("/(auth)/login");
-          },
-        },
-      ],
-    );
-  };
-
+ 
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
       <ScrollView
@@ -184,9 +167,7 @@ export default function Profile() {
         <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
           <Text style={styles.signOutText}>Log Out</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-          <Text style={styles.deleteText}>Delete Account</Text>
-        </TouchableOpacity>
+        
       </ScrollView>
       {activeManager && (
         <NameManagerModal
@@ -495,17 +476,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginTop: 3,
   },
-  photoAction: {
-    minHeight: 34,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 8,
-  },
-  photoActionText: {
-    color: colors.navy,
-    fontSize: 14,
-    fontWeight: "600",
-  },
   infoCard: {
     backgroundColor: colors.card,
     borderRadius: 18,
@@ -696,14 +666,5 @@ const styles = StyleSheet.create({
     color: colors.parchment,
     fontSize: 16,
     fontWeight: "700",
-  },
-  deleteButton: {
-    alignItems: "center",
-    paddingVertical: 16,
-  },
-  deleteText: {
-    color: colors.danger,
-    fontSize: 14,
-    fontWeight: "600",
   },
 });

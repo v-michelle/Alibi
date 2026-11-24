@@ -10,19 +10,17 @@ import { colors } from "@/lib/theme"
 import { BrandActivityIndicator, BrandLogo } from "@/components/Branding";
 import DateTimePicker from "@react-native-community/datetimepicker"
 
-const BUCKET = "alibi-photos"; // must match the bucket name you created
+const BUCKET = "alibi-photos"; 
+const EMPTY_PHOTO_PATHS: string[] = [];
 
 // Turns stored file paths into temporary viewable URLs
 function usePhotoUrls(paths: string[]) {
-  const [urls, setUrls] = useState<string[]>([]);
-  const key = paths.join("|");
+  const [urlState, setUrlState] = useState<{ paths: string[]; urls: string[] } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    if (paths.length === 0) {
-      setUrls([]);
-      return;
-    }
+    if (paths.length === 0) return;
+
     supabase.storage
       .from(BUCKET)
       .createSignedUrls(paths, 3600)
@@ -40,23 +38,23 @@ function usePhotoUrls(paths: string[]) {
           .map((d) => d.signedUrl ?? d.signedURL)
           .filter((url): url is string => !!url);
 
-        setUrls(signedUrls);
+        setUrlState({ paths, urls: signedUrls });
       });
     return () => {
       cancelled = true;
     };
-  }, [key]);
+  }, [paths]);
 
-  return urls;
+  return urlState?.paths === paths ? urlState.urls : [];
 }
 
 function PostCard({ post }: { post: Alibi }) {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const cardWidth = width - 40; // screen minus the list's 20px side padding
+  const cardWidth = width - 40; 
   const photoHeight = cardWidth * 0.75;
 
-  const paths = post.image_paths ?? [];
+  const paths = post.image_paths ?? EMPTY_PHOTO_PATHS;
   const photoUrls = usePhotoUrls(paths);
   const [page, setPage] = useState(0);
 
@@ -243,11 +241,6 @@ function FilterSheet({
 }) {
   const [draft, setDraft] = useState<Filters>(filters);
 
-  // Start from the applied filters each time the sheet opens
-  useEffect(() => {
-    if (visible) setDraft(filters);
-  }, [visible]);
-
   const toggle = (key: "categoryIds" | "personIds", id: number) =>
     setDraft((prev) => ({
       ...prev,
@@ -354,7 +347,12 @@ export default function Index() {
 
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [filterVisible, setFilterVisible] = useState(false);
+  const [filterOpenKey, setFilterOpenKey] = useState(0);
   const filterCount = activeCount(filters);
+  const openFilters = () => {
+    setFilterOpenKey((key) => key + 1);
+    setFilterVisible(true);
+  };
 
   // Only offer categories and people that appear on at least one post
   const categoryOptions = useMemo(() => {
@@ -404,7 +402,7 @@ export default function Index() {
       redirected.current = true;
       router.push("/(tabs)/create");
     }
-  }, [isLoading, alibis.length]);
+  }, [isLoading, alibis.length, router]);
 
   if (isLoading && alibis.length === 0) {
     return (
@@ -429,7 +427,7 @@ export default function Index() {
 
             <View style={styles.brandHeader}>
               <BrandLogo compact />
-              <TouchableOpacity style={styles.filterButton} onPress={() => setFilterVisible(true)}>
+              <TouchableOpacity style={styles.filterButton} onPress={openFilters}>
                 <Ionicons name="options-outline" size={22} color={colors.navy} />
                 {filterCount > 0 && (
                   <View style={styles.filterBadge}>
@@ -470,6 +468,7 @@ export default function Index() {
       />
 
       <FilterSheet
+        key={filterOpenKey}
         visible={filterVisible}
         onClose={() => setFilterVisible(false)}
         filters={filters}
@@ -509,17 +508,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.inkSoft,
     marginBottom: 20,
-  },
-  button: {
-    backgroundColor: colors.navy,
-    borderRadius: 12,
-    padding: 12,
-    alignItems: "center",
-  },
-  buttonText: {
-    color: colors.parchment,
-    fontSize: 16,
-    fontWeight: "bold",
   },
   emptyText: {
     textAlign: "center",
@@ -660,8 +648,7 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.4)",
-    color: colors.scrim
+    backgroundColor: colors.scrim
   },
   sheet: {
     backgroundColor: colors.parchment,
